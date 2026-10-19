@@ -7,12 +7,6 @@
   <a href="https://x.com/MiaAI_lab" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin:0 8px;vertical-align:middle;"><img src="https://img.shields.io/badge/Follow%20me%20on%20X-000000?style=for-the-badge&logo=x&logoColor=white" alt="Follow Mia on X" height="28" style="height:28px;width:auto;vertical-align:middle;border:0;" /></a>
 </p>
 
-> [!NOTE]
-> **Served and measured on one pair of Sparks** (a desktop Spark as the head, a second Spark as the worker): the 1017
-> checkpoint loads, answers requests and passes `tools/smoke.py`. Other cabling and hardware, image input and long-run
-> stability are not checked. **Memory on the head is tight**: see [Memory and safety](#memory-and-safety) before raising
-> `CONTEXT` or `PARALLEL`. [Status](#status) has the numbers and what is still open.
-
 Serve **DeepSeek-V4.1-Flash-1017** from two NVIDIA DGX Sparks (GB10, 128 GB each, linked by their ConnectX-7 ports)
 through an OpenAI-compatible API, with the full **1,048,576-token window**, **image input**, tool calling, thinking on
 or off, and **DSpark** speculative decoding from the checkpoint's own draft blocks, using
