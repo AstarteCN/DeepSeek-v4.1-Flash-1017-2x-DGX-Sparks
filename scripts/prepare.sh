@@ -102,8 +102,14 @@ log "Image $IMAGE identical on both Sparks"
 # ---------------------------------------------------------------- 3. the checkpoint and Engram's tables
 command -v hf >/dev/null || die "the Hugging Face CLI ('hf') is not installed on this Spark: pip install -U huggingface_hub"
 avail=$(df -B1 --output=avail "$HF_CACHE" | tail -1)
-[[ -d "$(model_cache_dir)/snapshots" ]] || (( avail > 420 * 1024 ** 3 )) ||
-  warn "$(( avail / 1024 ** 3 )) GiB free in $HF_CACHE: the checkpoint (196 GiB), Engram's tables (203 GB) and rank 0's weight file (~106 GB) need ~505 GB"
+# A checkpoint that is not in the cache under MODEL_ID's name and revision is downloaded whole (196 GiB). The cache is keyed by the
+# repo's name, so a copy downloaded under another name (the repo was renamed from ...-1017-EAQ-v1-2.9-bpw to ...-1017-EXL3-EAQ-v1-2.9-bpw) or
+# another revision does not count: refuse here when the disk cannot hold it, instead of filling the disk half way (README, Status)
+if [[ ! -f "$(model_cache_dir)/snapshots/$(snapshot_rev)/model.safetensors.index.json" ]]; then
+  (( avail > 215 * 1024 ** 3 )) || die "$MODEL_ID @ $(snapshot_rev | cut -c1-8) is not in $HF_CACHE/hub yet and only $(( avail / 1024 ** 3 )) GiB are free there; it is 196 GiB. If you already have this checkpoint under another repo name or revision, set MODEL_ID and MODEL_REVISION in scripts/local.sh to what $HF_CACHE/hub holds (scripts/local.sh.example); otherwise free the disk"
+  (( avail > 420 * 1024 ** 3 )) ||
+    warn "$(( avail / 1024 ** 3 )) GiB free in $HF_CACHE: the checkpoint (196 GiB), Engram's tables (203 GB) and rank 0's weight file (~106 GB) need ~505 GB"
+fi
 log "Downloading $MODEL_ID${MODEL_REVISION:+ @ ${MODEL_REVISION:0:8}} into $HF_CACHE/hub (196 GiB the first time; resumes)"
 if ! hf download "$MODEL_ID" ${MODEL_REVISION:+--revision "$MODEL_REVISION"} --cache-dir "$HF_CACHE/hub" >/dev/null; then
   [[ -n "$MODEL_REVISION" && -f "$(model_cache_dir)/snapshots/$MODEL_REVISION/model.safetensors.index.json" ]] ||
