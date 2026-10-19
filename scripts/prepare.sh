@@ -258,7 +258,9 @@ have=$(worker 1 "d=$WORKER_ENGRAM_DIR; s=0; for f in ${shards[*]}; do [[ -f \$d/
 if [[ "$have" == "$need" ]]; then log "Worker: Engram tables on its disk"
 else
   free=$(worker 1 "mkdir -p $WORKER_ENGRAM_DIR && df -B1 --output=avail $WORKER_ENGRAM_DIR | tail -1")
-  (( free + have > need + 150 * 1024 ** 3 )) || die "$(worker_host 1) has $(( free / 1024 ** 3 )) GiB free: Engram's tables need $(( need / 1024 ** 3 )) GiB on its disk (WORKER_ENGRAM_DIR), its weight file ~106 GB, and 10 GiB to spare"
+  # the ~140 GiB for rank 1's weight file is only needed while that file is not on its disk yet
+  spare=150; worker 1 "ls $WORKER_CACHE_DIR/rank1of2-*.bin >/dev/null 2>&1" && spare=10
+  (( free + have > need + spare * 1024 ** 3 )) || die "$(worker_host 1) has $(( free / 1024 ** 3 )) GiB free: Engram's tables need $(( need / 1024 ** 3 )) GiB on its disk (WORKER_ENGRAM_DIR), its weight file ~106 GB (unless it is already there), and $spare GiB to spare"
   log "Worker: copying Engram's tables to its disk ($(( need / 1024 ** 3 )) GiB over NFS, once)"
   worker 1 "docker run --rm --network none --user \$(id -u):\$(id -g) -v '$NFS_VOLUME:/hf:ro' -v $WORKER_ENGRAM_DIR:/out --entrypoint bash '$BASE_IMAGE' -c 'for f in model.safetensors.index.json config.json ${shards[*]}; do cp /hf/$SNAP_REL/\$f /out/\$f.part && mv /out/\$f.part /out/\$f || exit 1; done'" ||
     die "copying Engram's tables to $(worker_host 1) failed"

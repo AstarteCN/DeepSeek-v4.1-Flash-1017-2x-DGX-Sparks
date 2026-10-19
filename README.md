@@ -100,7 +100,7 @@ Known limits of the engine, from user reports (issues [#2](https://github.com/Mi
 carries images runs whole and keeps nothing ("a kept state knows no images"), so every turn of a conversation with images in its
 history is cold (~90 s at 160K tokens in the report); and a prompt pass runs to completion inside its admission, so other streams
 get no decode round meanwhile and a cancel waits for it (the pin `629c524` only lets streams within 256 tokens of `max_tokens`
-finish, for up to 5 s, after a pass of a second or more). Both are in BertholomusAI's engine, not in the recipe's scripts. Until
+finish, for up to 5 s, after a pass of a second or more; measured on the pair: a decoding stream got no token for 90 s while a 120K-token cold prompt prefilled). Both are in BertholomusAI's engine, not in the recipe's scripts. Until
 they change upstream: keep screenshots out of long agent histories, and do not start a cold long prompt while another chat is
 decoding. `ENGINE=jl` interleaves prompt pieces with other slots' decode (`TF_DSV41_PREFILL_PIECES`); its image prompt reuse
 was not tested here.
