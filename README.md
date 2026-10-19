@@ -19,7 +19,9 @@ or off, and **DSpark** speculative decoding from the checkpoint's own draft bloc
   and the DSpark blocks are in it; the revision is pinned in `scripts/config.sh`), plus Engram's two tables, unquantized,
   from `deepseek-ai/DeepSeek-V4.1-Flash-1017` @ `1bae0e10` (shards 47 and 48, ~203 GB; the quantization leaves them out)
 - API model id: `DeepSeek-V4.1-Flash-1017`, port 8888
-- Engine: TensorFold native (Zig 0.17.0), BertholomusAI's `dsv41` family at TP=2, one rank on each Spark
+- Engine: TensorFold native (Zig 0.17.0), BertholomusAI's `dsv41` family at TP=2, one rank on each Spark. A second engine is
+  built in: `ENGINE=jl ./start.sh` serves the same checkpoint with Jay Leaton's CUDA DeepSeek-V4.1 Zig engine
+  ([`docs/jl-engine.md`](docs/jl-engine.md); booted and smoke-tested on this pair, with a 500K-token pool; **not faster here**: decode 45 tok/s against 55-61 for the default engine on the same random-word benchmark, prefill about equal)
 - One command on the first Spark: `./start.sh` sets up both Sparks and starts both ranks; `./stop.sh` stops them
 - Optional `ABLIT=1`: keeps Mia EAQ 2.9 bpw and applies the matching [Keys overlay by drowzeys](https://huggingface.co/drowzeys/keys-DeepSeek-V4.1-Flash-1017-Abliterated).
   Requires your Hugging Face token and access to that gated repository; see [Abliterated mode](#abliterated-mode).
@@ -317,6 +319,10 @@ tools/smoke.py               a quick correctness check: health, stop strings, st
 tools/prompt_reuse.py        a conversation resumes from its kept prompt state (from the GLM-5.3-Flash recipe)
 tools/toolcheck.py, needle.py, end_of_turn.py, anthropiccheck.py   single checks, from the GLM-5.3-Flash recipe
 docs/zig-engine.md           how the pieces fit, and what is not verified
+docs/jl-engine.md            ENGINE=jl: Jay Leaton's engine, its preparation and settings, what is not verified
+jl/Dockerfile                ENGINE=jl's image: his engine at JL_REF, plus an assets image on the PyTorch container
+scripts/jl-prepare.sh        ENGINE=jl: image, Engram's per-rank shards, the AOT set and the other assets, on both nodes
+scripts/jl-env.sh            ENGINE=jl: the engine settings both ranks get (his serving profile)
 docs/hermes-agent.md         Hermes Agent as a client (by Steve Darlow)
 ```
 
@@ -356,6 +362,13 @@ third-party parts keep theirs ([`NOTICE`](NOTICE)).
   Commits in that branch by [sayyidfareed](https://github.com/sayyidfareed) (RDMA GID and MTU),
   [Lucas Peters](https://github.com/lucas-peters) (indexer alignment; the kit's `_topk_sel` variant), lepetitprince716-prog
   (expert-run loading) and LeetJoe (image placeholder escaping).
+- **[Jay Leaton (jayleaton)](https://github.com/jayleaton)** (Apache-2.0) authored the CUDA DeepSeek-V4.1 Zig engine served by
+  `ENGINE=jl` (decode and prefill kernels, DSpark drafting, split KV, 4K prefill, the RoCE plan mailbox, sessions, the vision
+  path), its serving profile, dense-prefill tuning table, image recipe, launch commands and Engram packer, in his recipe
+  [jayleaton/deepseek-v41-tensorfold-spark](https://github.com/jayleaton/deepseek-v41-tensorfold-spark) at
+  [`853310d`](https://github.com/jayleaton/deepseek-v41-tensorfold-spark/commit/853310dab967480013eda7cef4e79c2fd041629a);
+  [BobClawblaw](https://github.com/BobClawblaw) authored the NCCL cuMem fix in it that `ENGINE=jl` uses
+  ([`2cd03c8`](https://github.com/jayleaton/deepseek-v41-tensorfold-spark/commit/2cd03c862f034d069f4419dc0042c8b2ac0cd433)).
 - **Mia's AI Lab**: this recipe's scripts, adapted from
   [GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold](https://github.com/MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold)
   (branch `zig-engine`), with code by webzone (both PCIe links of a port as twin rails), [Alexbob0](https://github.com/Alexbob0)

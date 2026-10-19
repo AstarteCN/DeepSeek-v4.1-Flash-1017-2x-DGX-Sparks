@@ -16,6 +16,8 @@
 #   API_KEY=1 ./start.sh restart  # require an API key (generated in $STATE_DIR/api-key, mode 600; see scripts/config.sh)
 #   FOREGROUND=1 ./start.sh       # stay attached to rank 0's log and exit with its code (for systemd Restart=on-failure)
 #   DRY_RUN=1 ./start.sh        # print the link found and both ranks' docker commands, change nothing and start nothing
+#   ENGINE=jl ./start.sh restart  # serve with Jay Leaton's CUDA DeepSeek-V4.1 Zig engine instead (docs/jl-engine.md): its own
+#                               # preparation (scripts/jl-prepare.sh), settings (scripts/jl-env.sh) and commands
 # Extra arguments go to rank 0's `tensorfold-native serve` after the defaults, so they win.
 # Setup: WORKER (an ssh target, key-based) in scripts/local.sh.
 # Settings, from the environment, scripts/local.sh or ./.env (defaults and their notes in scripts/config.sh):
@@ -24,7 +26,9 @@
 #   nodes    WORKER, FABRIC_PEER, MASTER_ADDR, MASTER_PORT, SOCKET_IFNAME, NCCL_RAILS, NCCL_DEBUG
 #   files    ABLIT (0 | 1), ABLIT_REVISION, MODEL_ID, MODEL_REVISION, ENGRAM_ID, ENGRAM_REVISION, HF_CACHE, NFS_PATH, NFS_SERVER, NFS_VOLUME,
 #            WORKER_ENGRAM_DIR, WORKER_CACHE_DIR, STATE_DIR, LOG_DIR, LOG_KEEP
-#   engine   TF_REPO, TF_REF, INPUTS_REF, KIT_REPO, KIT_REF, ZIG_VERSION, BASE_IMAGE, IMAGE, CONTAINER_NAME
+#   engine   ENGINE (zig | jl), TF_REPO, TF_REF, INPUTS_REF, KIT_REPO, KIT_REF, ZIG_VERSION, BASE_IMAGE, IMAGE, CONTAINER_NAME
+#            ENGINE=jl: JL_REPO, JL_REF, JL_ROOT, WORKER_JL_ROOT, JL_POOL_TOKENS, JL_KV_SPLIT, JL_PF_4K, JL_EXPERT_TOPP,
+#            JL_SESSION_DISK_GIB, and any TF_DSV41_* variable (to both ranks)
 #   setup    PREPARE (auto | 1 | 0), WAIT_TIMEOUT (seconds, default 2400), DRY_RUN=1
 #   memory   MIN_AVAIL_GIB (refuse to start below it), MEMGUARD_GIB (kill a rank's container below it), HEAD_NFS_SERVER,
 #            HEAD_NFS_VOLUME (rank 0 reads the checkpoint over NFS through a docker volume)
@@ -36,7 +40,7 @@ source ./scripts/config.sh
 source ./scripts/nodes.sh
 
 usage() { awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; }
-WAIT_TIMEOUT="${WAIT_TIMEOUT:-2400}"
+WAIT_TIMEOUT="${WAIT_TIMEOUT:-$([[ "$ENGINE" == jl ]] && echo 5400 || echo 2400)}"   # jl's first start also writes ~95 GB of prepared weights
 MODE=start
 case "${1:-}" in
   restart) MODE=restart; shift ;;
@@ -57,12 +61,21 @@ nccl_extra_collect
 check_workers
 
 # rank 0's command (its serve flags need no link): built first, so the flags can be checked before anything is stopped
+if [[ "$ENGINE" == jl ]]; then
+  # Jay Leaton's engine: tensorfold-dsv41 serve (his scripts/run-zig.sh); drafts, graphs, the pool and the rest are its
+  # environment (scripts/jl-env.sh), the same on both ranks
+  [[ "$DRAFTS" == 1 ]] || die "ENGINE=jl serves with drafts (DRAFTS=1): its profile was measured and its AOT set built that way"
+  SERVE=(tensorfold-dsv41 serve "$(served_in_container)" --host "$HOST" --port "$PORT" --name "$SERVED_NAME"
+         --context "$CONTEXT" --parallel "$PARALLEL" --max-tokens "$MAX_TOKENS" --temperature "$TEMPERATURE" --top-p "$TOP_P" --top-k "$TOP_K")
+  [[ -z "$ROUND_ROWS" ]] || warn "ROUND_ROWS is the other engine's setting: ENGINE=jl ignores it (TF_DSV41_ROWS_CAP is its rows limit)"
+else
 SERVE=(tensorfold-native serve "$(served_in_container)" --backend cuda --host "$HOST" --port "$PORT" --name "$SERVED_NAME"
        --context "$CONTEXT" --parallel "$PARALLEL" --max-tokens "$MAX_TOKENS" --temperature "$TEMPERATURE" --top-p "$TOP_P" --top-k "$TOP_K")
+fi
 if [[ "$THINKING" == 1 ]]; then SERVE+=(--thinking); else SERVE+=(--no-thinking); fi
 [[ -z "$REASONING_EFFORT" ]] || SERVE+=(--reasoning-effort "$REASONING_EFFORT")
 # drafts off on rank 0 as on rank 1 (a follower without the drafter refuses a drafted round)
-[[ "$DRAFTS" == 1 ]] || SERVE+=(--no-drafts)
+[[ "$DRAFTS" == 1 || "$ENGINE" == jl ]] || SERVE+=(--no-drafts)
 [[ "$API_KEY" != 1 ]] || SERVE+=(--api-key-file "$API_KEY_IN_CONTAINER")
 SERVE+=("$@")
 
@@ -72,7 +85,7 @@ source ./scripts/banner.sh
 echo
 banner
 printf '\n%s  Mia'"'"'s TensorFold Start Script%s\n' "$M" "$R"
-printf '%s  %s · 2 x DGX Spark · %s at once · %s-token window · EXL3 2.9 bpw · port %s%s\n\n' "$D" "$MODEL_ID" "$PARALLEL" "$CONTEXT" "$PORT" "$R"
+printf '%s  %s · 2 x DGX Spark · %s at once · %s-token window · EXL3 2.9 bpw · port %s%s%s\n\n' "$D" "$MODEL_ID" "$PARALLEL" "$CONTEXT" "$PORT" "$([[ "$ENGINE" == jl ]] && echo ' · engine: Jay Leaton (jl)')" "$R"
 STEPS=5
 step() { printf '%s[%s/%s]%s %s%s%s\n' "$M" "$1" "$STEPS" "$R" "$B" "$2" "$R"; }
 
@@ -125,7 +138,7 @@ MODEL_ARG=$(model_in_container)
 step 2 "Checks: link, previous server, port, memory"
 # HEAD_ENGRAM_DIR: every Engram shard there, whole, before anything is stopped or started (a missing or short shard would
 # only show up as a failed or slow rank 0 after rank 1 is up)
-if [[ -n "$HEAD_ENGRAM_DIR" ]] && (( ! DRY )); then
+if [[ -n "$HEAD_ENGRAM_DIR" && "$ENGINE" != jl ]] && (( ! DRY )); then
   for f in $ENGRAM_SHARDS; do
     [[ -f "$HEAD_ENGRAM_DIR/$f" ]] || die "HEAD_ENGRAM_DIR $HEAD_ENGRAM_DIR has no $f (needs: $ENGRAM_SHARDS)"
     if [[ "$ENGRAM_ID" == deepseek-ai/DeepSeek-V4.1-Flash-1017 && -n "${ENGRAM_SHARD_SIZE[$f]:-}" ]]; then
@@ -141,7 +154,12 @@ for r in 0 1; do
 done
 # the serve flags against what this build of tensorfold-native serves (scripts/zig_flags.py, from the GLM-5.3-Flash recipe):
 # the binary refuses an unsupported flag at start, after the container is up and the old server stopped
-if docker image inspect "$IMAGE" >/dev/null 2>&1; then
+if [[ "$ENGINE" == jl ]]; then
+  if docker image inspect "$IMAGE" >/dev/null 2>&1; then
+    docker run --rm --network none --entrypoint tensorfold-dsv41 "$IMAGE" capabilities --json |
+      python3 scripts/zig_flags.py "${SERVE[@]:3}" || die "rank 0's serve arguments are not ones $IMAGE serves (above); nothing was stopped"
+  fi
+elif docker image inspect "$IMAGE" >/dev/null 2>&1; then
   docker run --rm --network none --entrypoint tensorfold-native "$IMAGE" capabilities --json |
     python3 scripts/zig_flags.py "${SERVE[@]:3}" || die "rank 0's serve arguments are not ones $IMAGE serves (above); nothing was stopped"
 fi
@@ -190,6 +208,49 @@ foreground() {
   worker 1 "docker stop -t ${STOP_TIMEOUT:-30} '$CONTAINER_NAME'" >/dev/null 2>&1 || true
   exit "$code"
 }
+if [[ "$ENGINE" == jl ]]; then
+# ENGINE=jl: Jay Leaton's engine, started as his scripts/run-zig.sh starts it (rank 1: tf-dsv41-m1 follow, rank 0:
+# tensorfold-dsv41 serve), with this recipe's link detection, NFS volume and API key. Both ranks read the same environment
+# (scripts/jl-env.sh); each has its own Engram shards, assets, prepared weight images and state on its local disk. TF_TP_ROCE_HCA
+# names the RoCE devices scripts/nodes.sh found (the GID index is the engine's own detection: indices move on reboot).
+# NCCL's cuMem allocations are off on both ranks (BobClawblaw, in his scripts/serve.sh: on a GB10 they exhausted the driver's
+# pool at boot, NV_ERR_NO_MEMORY, and failed later starts); NCCL_CUMEM_ENABLE=1 in the environment turns them back on.
+jl_env_build
+envs() { local x; for x in "$@"; do printf -- '-e %q ' "$x"; done; }
+RUN_ARGS="--label tf.recipe.ablit=$(ablit_identity) --init --gpus all --ipc=host --network host --ulimit memlock=-1 --ulimit stack=67108864 --cap-add IPC_LOCK --device /dev/infiniband"
+JL_MODEL=$(served_in_container)
+J_ENGRAM=$(jl_engram_dir "$JL_ROOT"); J_ASSETS=$(jl_assets_dir "$JL_ROOT"); J_PREP=$(jl_prepared_dir "$JL_ROOT")
+J_STATE=$(jl_state_dir "$JL_ROOT"); J_CACHE=$(jl_cache_dir "$JL_ROOT")
+WJ_ENGRAM=$(jl_engram_dir "$WORKER_JL_ROOT"); WJ_ASSETS=$(jl_assets_dir "$WORKER_JL_ROOT"); WJ_PREP=$(jl_prepared_dir "$WORKER_JL_ROOT")
+WJ_STATE=$(jl_state_dir "$WORKER_JL_ROOT"); WJ_CACHE=$(jl_cache_dir "$WORKER_JL_ROOT")
+CUMEM=(NCCL_CUMEM_HOST_ENABLE="${NCCL_CUMEM_HOST_ENABLE:-0}" NCCL_CUMEM_ENABLE="${NCCL_CUMEM_ENABLE:-0}")
+TP_ENV=(TF_TP_WORLD=2 "TF_TP_MASTER=${LINK_HEAD_ADDR[1]:-$MASTER_ADDR}" "TF_TP_PORT=$MASTER_PORT" TF_TP_DEVICE=0 "HF_HUB_OFFLINE=$HF_HUB_OFFLINE")
+AUTH=()      # curl's Authorization header (a file, so the key stays out of ps) when API_KEY=1
+if [[ "$API_KEY" == 1 ]]; then
+  if (( DRY )); then log "DRY_RUN: API_KEY=1: the key would be read from $API_KEY_FILE (created, mode 600, when missing)"
+  else api_key_ensure; AUTH=(-H "@$(api_header_file)"); fi
+fi
+step 3 "Launch: container $CONTAINER_NAME, rank 1 on the worker, then rank 0 here (engine: Jay Leaton, jl)"
+cmd="tf-dsv41-m1 follow $JL_MODEL $JL_ASSETS_IN"
+R1_ENV=("${TP_ENV[@]}" TF_TP_RANK=1 "${CUMEM[@]}"); [[ "$RDMA" == 0 ]] || R1_ENV+=("TF_TP_ROCE_HCA=${NODE_HCAS[1]}")
+remote="docker run -d --name $CONTAINER_NAME $RUN_ARGS -v $NFS_VOLUME:/hf:ro -v $WJ_ENGRAM:$JL_ENGRAM_IN:ro -v $WJ_ASSETS:$JL_ASSETS_IN:ro -v $WJ_PREP:$JL_PREPARED_IN -v $WJ_STATE:$JL_STATE_IN -v $WJ_STATE/sessions:$JL_SESSIONS_IN -v $WJ_CACHE:$JL_CACHE_IN $(envs "${JL_ENV[@]}" "${R1_ENV[@]}") $(rank_nccl_env 1) $IMAGE $cmd"
+if (( DRY )); then printf '[dry-run] rank 1 on %s:\n  %s\n' "$(worker_host 1)" "$remote"
+else
+  log "Rank 1 on $(worker_host 1): $cmd"
+  worker 1 "$remote" >/dev/null || die "could not start rank 1 on $(worker_host 1)"
+fi
+R0_ENV=("${TP_ENV[@]}" TF_TP_RANK=0 "${CUMEM[@]}"); [[ "$RDMA" == 0 ]] || R0_ENV+=("TF_TP_ROCE_HCA=${NODE_HCAS[0]}")
+if (( DRY )); then HEAD_HF=${HEAD_NFS_SERVER:+$HEAD_NFS_VOLUME}; HEAD_HF=${HEAD_HF:-$HF_CACHE}; else HEAD_HF=$(head_hf_mount); fi
+here=(docker run -d --name "$CONTAINER_NAME" $RUN_ARGS -v "$HEAD_HF:/hf:ro" -v "$J_ENGRAM:$JL_ENGRAM_IN:ro" -v "$J_ASSETS:$JL_ASSETS_IN:ro"
+      -v "$J_PREP:$JL_PREPARED_IN" -v "$J_STATE:$JL_STATE_IN" -v "$J_STATE/sessions:$JL_SESSIONS_IN" -v "$J_CACHE:$JL_CACHE_IN")
+if [[ "$API_KEY" == 1 ]]; then here+=(-v "$API_KEY_FILE:$API_KEY_IN_CONTAINER:ro"); fi
+for x in "${JL_ENV[@]}" "${R0_ENV[@]}"; do here+=(-e "$x"); done
+rank_nccl_args 0
+here+=("${NCCL_ARGS[@]}" "$IMAGE" "${SERVE[@]}")
+if (( DRY )); then printf '[dry-run] rank 0 here:\n  %s\n' "$(printf '%q ' "${here[@]}")"; exit 0; fi
+log "Rank 0 here: ${SERVE[*]}"
+"${here[@]}" >/dev/null
+else
 # What both ranks' engine reads, as BertholomusAI's two-node launch has it (HF_CACHE at /hf: this Spark's own, the worker's over NFS)
 ENGINE_ENV=("TF_DS_REPLAY_FLOOR=$REPLAY_FLOOR" "TF_DS_STREAMS=$PARALLEL" "HF_HUB_OFFLINE=$HF_HUB_OFFLINE")
 [[ -z "$ROUND_ROWS" ]] || ENGINE_ENV+=("TF_DS_ROUND_ROWS=$ROUND_ROWS")
@@ -237,6 +298,7 @@ here+=("${NCCL_ARGS[@]}" "$IMAGE" "${SERVE[@]}")
 if (( DRY )); then printf '[dry-run] rank 0 here:\n  %s\n' "$(printf '%q ' "${here[@]}")"; exit 0; fi
 log "Rank 0 here: ${SERVE[*]}"
 "${here[@]}" >/dev/null
+fi
 [[ "${FOREGROUND:-0}" != 1 ]] || foreground
 
 # ---------------------------------------------------------------- 4. load

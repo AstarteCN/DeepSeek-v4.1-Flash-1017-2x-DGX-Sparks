@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `ENGINE=jl`: a second engine, Jay Leaton's CUDA DeepSeek-V4.1 Zig engine (`engine/zig` of
+  [jayleaton/deepseek-v41-tensorfold-spark](https://github.com/jayleaton/deepseek-v41-tensorfold-spark) @ `853310d`), built by
+  `jl/Dockerfile` and served by the same `./start.sh` (`ENGINE=jl ./start.sh restart`), with `scripts/jl-prepare.sh` (image,
+  Engram's per-rank shards packed with his `pack_engram.py`, the AOT set of Triton programs, RoPE tables, Engram's host
+  lookup), `scripts/jl-env.sh` (his serving profile; expert pruning off, `JL_EXPERT_TOPP` opts in; NCCL cuMem off, from
+  BobClawblaw's fix in his repository) and `docs/jl-engine.md`. The default engine and its files are unchanged.
+  Booted on the pair after `scripts/jl-fixup-pack.py` widened the EAQ pack's F16 DSpark router biases and confidence head to F32 (his engine loads only F32/BF16) and a 500K-token pool (the engine's boot check). `tools/smoke.py` passes; with random-word prompts decode is 45 tok/s against 55-61 for `ENGINE=zig`, prefill about equal (docs/jl-engine.md, Measured here).
 - First version: DeepSeek-V4.1-Flash-1017 EXL3 2.9 bpw on two DGX
   Sparks, TensorFold's native Zig engine with BertholomusAI's `dsv41` family (`deepseek-v41-zig` @ `3ff3b2ac`), their kit
   (`abe07c7`) and their weight-file tool (`deepseek-v41-zig-tp4` @ `5940208`). Scripts adapted from the GLM-5.3-Flash

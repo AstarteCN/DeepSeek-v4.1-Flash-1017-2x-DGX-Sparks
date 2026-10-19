@@ -22,6 +22,8 @@ set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")/.."
 source ./scripts/config.sh
 source ./scripts/nodes.sh
+# ENGINE=jl has its own preparation: Jay Leaton's engine, its Engram shards and its AOT set (docs/jl-engine.md)
+[[ "$ENGINE" != jl ]] || exec ./scripts/jl-prepare.sh "$@"
 
 REBUILD=0
 for arg in "$@"; do

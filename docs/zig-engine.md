@@ -2,7 +2,8 @@
 
 `./start.sh` serves the EXL3 checkpoint with TensorFold's native Zig engine, `tensorfold-native`, carrying BertholomusAI's
 `dsv41` family (the DeepSeek-V4.1-Flash model on TensorFold's CUDA lane core). Two ranks, one on each Spark; rank 0
-serves the API and drives the rounds, rank 1 (`tf-dsv41-lanes`) follows. Credits: [`../CREDITS.md`](../CREDITS.md).
+serves the API and drives the rounds, rank 1 (`tf-dsv41-lanes`) follows. Credits: [`../CREDITS.md`](../CREDITS.md). A second engine, Jay Leaton's, is selectable with `ENGINE=jl`:
+[`jl-engine.md`](jl-engine.md).
 
 ## What is in the image
 

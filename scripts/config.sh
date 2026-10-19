@@ -73,14 +73,41 @@ KIT_REF="${KIT_REF:-abe07c7d509a0199cc7fec15263be2aa52ac652f}"
 ZIG_VERSION="${ZIG_VERSION:-0.17.0}"
 ZIG_SHA256="${ZIG_SHA256:-9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8}"   # zig-aarch64-linux-0.17.0.tar.xz
 BASE_IMAGE="${BASE_IMAGE:-nvcr.io/nvidia/pytorch:26.07-py3}"
-image_hash() {
-  ( cd "$_cfg_root" || exit 1
-    cat zig/patches/*.patch 2>/dev/null
-    cat zig/Dockerfile
-    echo "$TF_REPO $TF_REF $INPUTS_REF zig-$ZIG_VERSION $ZIG_SHA256 $BASE_IMAGE"
-  ) | sha256sum | cut -c1-12
-}
-TAG_BASE="exl3-tp2"             # the image tag's prefix: <TAG_BASE>-<image hash>
+
+# ---------------------------------------------------------------- the engine to serve with
+# ENGINE=zig (the default): BertholomusAI's engine above, with zig/patches. ENGINE=jl: Jay Leaton's CUDA DeepSeek-V4.1 Zig
+# engine, the engine/zig export of https://github.com/jayleaton/deepseek-v41-tensorfold-spark, built from jl/Dockerfile at
+# JL_REF. It has its own settings (TF_DSV41_*, scripts/jl-env.sh), its own per-rank files (packed Engram shards, the AOT
+# set, prepared weights) and its own prepare step (scripts/jl-prepare.sh); the checkpoint, the worker's NFS volume, the
+# link detection, ./stop.sh and the memory guards are shared. docs/jl-engine.md.
+ENGINE="${ENGINE:-zig}"; export ENGINE
+JL_REPO="${JL_REPO:-https://github.com/jayleaton/deepseek-v41-tensorfold-spark.git}"
+JL_REF="${JL_REF:-853310dab967480013eda7cef4e79c2fd041629a}"
+# the Python reference tree his Triton fill and asset generators read: TensorFold 0.6.0 (his vendor/TensorFold pin) plus
+# his patches/ applied in order
+JL_PY_REPO="${JL_PY_REPO:-https://github.com/ashhart/TensorFold.git}"
+JL_PY_REF="${JL_PY_REF:-c4646171139ee8a3c38103eaa1699dad226ec12b}"
+# the CUDA images his Dockerfile builds on (nvcc 13.0.1 builds the engine's kernels)
+JL_CUDA_DEVEL="${JL_CUDA_DEVEL:-nvcr.io/nvidia/cuda:13.0.1-devel-ubuntu24.04}"
+JL_CUDA_RUNTIME="${JL_CUDA_RUNTIME:-nvcr.io/nvidia/cuda:13.0.1-base-ubuntu24.04}"
+if [[ "$ENGINE" == jl ]]; then
+  image_hash() {
+    ( cd "$_cfg_root" || exit 1
+      cat jl/Dockerfile
+      echo "$JL_REPO $JL_REF $JL_PY_REPO $JL_PY_REF zig-$ZIG_VERSION $ZIG_SHA256 $JL_CUDA_DEVEL $JL_CUDA_RUNTIME $BASE_IMAGE"
+    ) | sha256sum | cut -c1-12
+  }
+  TAG_BASE="jl-tp2"
+else
+  image_hash() {
+    ( cd "$_cfg_root" || exit 1
+      cat zig/patches/*.patch 2>/dev/null
+      cat zig/Dockerfile
+      echo "$TF_REPO $TF_REF $INPUTS_REF zig-$ZIG_VERSION $ZIG_SHA256 $BASE_IMAGE"
+    ) | sha256sum | cut -c1-12
+  }
+  TAG_BASE="exl3-tp2"           # the image tag's prefix: <TAG_BASE>-<image hash>
+fi
 IMAGE="${IMAGE:-tensorfold-dsv41:$TAG_BASE-$(image_hash)}"
 # A published image of these pins, if any (scripts/publish-image.sh pushes it; the registry handling is the GLM-5.3-Flash
 # recipe's): prepare.sh pulls $GHCR_IMAGE:<TAG_BASE>-<hash>, or, when IMAGE_TAG names that tag and IMAGE_DIGEST is set,
@@ -153,6 +180,28 @@ STATE_DIR="${STATE_DIR:-$HOME/.local/state/dsv41-tensorfold}"   # locks and the 
 LOG_DIR="${LOG_DIR:-$HOME/.cache/dsv41-tensorfold/logs}"
 LOG_KEEP="${LOG_KEEP:-10}"
 HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
+
+# ---------------------------------------------------------------- ENGINE=jl: its files and settings (docs/jl-engine.md)
+# Per node, on its own local disk (nothing here is read over NFS): Engram's packed per-rank shards (~94 GiB), the weights'
+# prepared layer images the engine writes on its first start (~95 GB), the per-rank assets (RoPE tables, Engram's host
+# lookup, the Triton programs), the state (sessions, request log, draft-cost tables) and the dense-prefill tuning table.
+# On the worker the same folders sit under WORKER_JL_ROOT (a path on the worker; $HOME is that of its login).
+_jl_tag="${MODEL_REVISION:0:8}"; [[ "$ABLIT" != 1 ]] || _jl_tag+="-ablit-${ABLIT_REVISION:0:8}"
+JL_ROOT="${JL_ROOT:-$HOME/.cache/dsv41-tensorfold/jl}"
+WORKER_JL_ROOT="${WORKER_JL_ROOT:-\$HOME/.cache/dsv41-tensorfold/jl}"
+jl_engram_dir()   { echo "$1/engram-${ENGRAM_REVISION:0:8}"; }
+jl_assets_dir()   { echo "$1/assets-$_jl_tag"; }
+jl_prepared_dir() { echo "$1/prepared-$_jl_tag"; }
+jl_state_dir()    { echo "$1/state-$_jl_tag"; }
+jl_cache_dir()    { echo "$1/cache"; }
+# Settings (the rest of the engine's profile is in scripts/jl-env.sh):
+JL_KV_SPLIT="${JL_KV_SPLIT:-1}"           # compressed KV rows sharded over the two ranks instead of replicated (a bigger pool)
+# The paged KV pool the slots share, in tokens. 2,100,000 is his flash17 pack's figure: bigger pools took the head under the
+# engine's 4 GiB memory floor during 4K prefills. Without split KV (JL_KV_SPLIT=0) his speed-first figure is 1,400,000.
+JL_POOL_TOKENS="${JL_POOL_TOKENS:-$([[ "$JL_KV_SPLIT" == 0 ]] && echo 1400000 || echo 2100000)}"
+JL_PF_4K="${JL_PF_4K:-1}"                 # 4,096-row prefill pieces (they fall back to 2K segments when memory is short)
+JL_EXPERT_TOPP="${JL_EXPERT_TOPP:-}"      # empty: exact. 0.85 prunes decode's routed experts (his profile: lossy, top-1 0.9944)
+JL_SESSION_DISK_GIB="${JL_SESSION_DISK_GIB:-32}"   # the NVMe tier of parked chat sessions (his profile: 128)
 # Rank 0 can read the checkpoint over NFS too, from HEAD_NFS_SERVER (an address of the NFS server that reaches this Spark),
 # through a docker volume HEAD_NFS_VOLUME that start.sh creates here (the docker daemon mounts it: no root, and it survives a
 # reboot). Empty: rank 0 reads HF_CACHE as a host path. Not sshfs: it reports every file as type "unknown", which the engine
@@ -181,6 +230,12 @@ _c() { [[ -t "$1" ]] && printf '\033[%sm' "$2" || true; }
 log()  { printf '%s[%s]%s %s\n' "$(_c 1 '1;36')" "$(basename "$0")" "$(_c 1 0)" "$*"; }
 warn() { printf '%s[%s] WARN:%s %s\n' "$(_c 2 '1;33')" "$(basename "$0")" "$(_c 2 0)" "$*" >&2; }
 die()  { printf '%s[%s] ERROR:%s %s\n' "$(_c 2 '1;31')" "$(basename "$0")" "$(_c 2 0)" "$*" >&2; exit 1; }
+[[ "$ENGINE" =~ ^(zig|jl)$ ]] || die "ENGINE is zig or jl, not $ENGINE"
+for _v in JL_KV_SPLIT JL_PF_4K; do [[ "${!_v}" =~ ^[01]$ ]] || die "$_v is 0 or 1, not ${!_v}"; done
+[[ "$JL_POOL_TOKENS" =~ ^[1-9][0-9]*$ ]] || die "JL_POOL_TOKENS is a positive number of tokens, not $JL_POOL_TOKENS"
+[[ "$JL_SESSION_DISK_GIB" =~ ^[1-9][0-9]*$ ]] || die "JL_SESSION_DISK_GIB is a positive number of GiB, not $JL_SESSION_DISK_GIB"
+[[ -z "$JL_EXPERT_TOPP" || "$JL_EXPERT_TOPP" =~ ^0\.[0-9]+$ ]] || die "JL_EXPERT_TOPP is empty (exact) or a fraction such as 0.85, not $JL_EXPERT_TOPP"
+unset _v
 
 [[ -z "${HF_TOKEN:-}" ]] || export HF_TOKEN
 ablit_notice() {
@@ -216,6 +271,16 @@ prepared_state() {
        "w=$(worker_host 1) wengram=$WORKER_ENGRAM_DIR wcache=$WORKER_CACHE_DIR ablit=$ABLIT" \
        "overlay=$( [[ "$ABLIT" == 1 ]] && echo "$ABLIT_ID@$ABLIT_REVISION" || echo none)"
 }
+# ENGINE=jl: what scripts/jl-prepare.sh last left ready. The AOT set follows the engine settings (scripts/jl-env.sh), so their
+# hash is part of it: change the window, the slots or a TF_DSV41_* value that shapes a Triton program and start.sh prepares again.
+if [[ "$ENGINE" == jl ]]; then
+  source "$_cfg_root/scripts/jl-env.sh"
+  prepared_state() {
+    jl_env_build
+    echo "engine=jl model=$MODEL_ID@$(snapshot_rev) engram=$ENGRAM_ID@$(engram_rev) image=$(image_ident "$IMAGE") jl=$JL_REF" \
+         "w=$(worker_host 1) wroot=$WORKER_JL_ROOT ablit=$ABLIT aot=$(jl_env_aot_hash) 4k=$JL_PF_4K split=$JL_KV_SPLIT"
+  }
+fi
 
 # ---------------------------------------------------------------- API key
 # The API is open on the network by default: anyone who can reach PORT can use the GPUs. API_KEY=1 makes rank 0 require a key

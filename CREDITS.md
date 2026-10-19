@@ -58,6 +58,23 @@ License 2.0 ([`LICENSE`](LICENSE)); [`NOTICE`](NOTICE) carries the notices that 
   two ranks' launch commands in `start.sh` are BertholomusAI's, from their recipe's README ("Run it (v0.6.0, the Zig
   engine)").
 
+- **The CUDA DeepSeek-V4.1 Zig engine of `ENGINE=jl`** was authored by **[Jay Leaton (jayleaton)](https://github.com/jayleaton)**
+  (Apache-2.0): the CUDA DeepSeek-V4.1 family on TensorFold 1.0.2 (`engine/zig`: the decode and prefill kernels, DSpark drafting,
+  split KV, 4K prefill pieces, CED replay, the RoCE plan mailbox, sessions, the vision path), its serving profile
+  (`config/prod-zig-flash17.env.example`) and dense-prefill tuning table (`config/pfdense-table.json`), the image recipe
+  (`docker/zig/Dockerfile`), the rank launch commands (`scripts/run-zig.sh`), the Engram packer (`scripts/pack_engram.py`) and the
+  asset-generation steps (`docs/ZIG-SERVE.md`), in his recipe
+  [jayleaton/deepseek-v41-tensorfold-spark](https://github.com/jayleaton/deepseek-v41-tensorfold-spark) at commit
+  [`853310d`](https://github.com/jayleaton/deepseek-v41-tensorfold-spark/commit/853310dab967480013eda7cef4e79c2fd041629a)
+  (Apache-2.0). `jl/Dockerfile` builds that commit and `ENGINE=jl ./start.sh` serves both ranks with it; `scripts/jl-env.sh`,
+  `scripts/jl-prepare.sh` and the `ENGINE=jl` branches of `start.sh` follow his profile, scripts and documentation (details in
+  [`NOTICE`](NOTICE) and [`docs/jl-engine.md`](docs/jl-engine.md)). What he credits inside it applies here too, among it
+  [local-inference-lab/b12x](https://github.com/local-inference-lab/b12x) (Luke Alonso and the b12x contributors, Apache-2.0),
+  whose "RoCEnante" all-gather his TP RoCE transport adapts. Commit in that repository by another author:
+  - **[BobClawblaw](https://github.com/BobClawblaw)** authored the NCCL cuMem fix (`NCCL_CUMEM_ENABLE=0`,
+    `NCCL_CUMEM_HOST_ENABLE=0`: on a GB10 NCCL's cuMem allocations exhausted the driver's pool at boot) in his `scripts/serve.sh`
+    ([`2cd03c8`](https://github.com/jayleaton/deepseek-v41-tensorfold-spark/commit/2cd03c862f034d069f4419dc0042c8b2ac0cd433)),
+    used here for both ranks of `ENGINE=jl`.
 ## Scripts
 
 - The scripts' structure, the layered settings (`scripts/config.sh`), the node discovery and NFS volumes

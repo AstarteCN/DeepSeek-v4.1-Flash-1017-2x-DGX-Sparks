@@ -28,10 +28,26 @@ The DeepSeek-V4.1 kernel kit (BertholomusAI's two-node recipe)
   kit/KIT-LICENSES.md lists (Triton: MIT; PyTorch's attention kernel: BSD-3-Clause, on NVIDIA CUTLASS: BSD-3-Clause;
   the EXL3 format of ExLlamaV3 by turboderp: MIT). scripts/prepare.sh fetches it; it is not part of this repository.
 
+The CUDA DeepSeek-V4.1 Zig engine of ENGINE=jl (Jay Leaton)
+  https://github.com/jayleaton/deepseek-v41-tensorfold-spark (commit 853310dab967480013eda7cef4e79c2fd041629a: engine/zig,
+  docker/zig/Dockerfile, scripts/run-zig.sh, scripts/pack_engram.py, config/prod-zig-flash17.env.example,
+  config/pfdense-table.json and patches/)
+  Written by Jay Leaton (jayleaton), Copyright 2026 Jay Leaton, on TensorFold 1.0.2. Apache License, Version 2.0 (his
+  engine/zig is a TensorFold source export, Apache-2.0, and keeps TensorFold's NOTICE, THIRD_PARTY_NOTICES.md and LICENSES;
+  his DeepSeek-V4.1 family files keep the SPDX notices written in them, MIT where they say so). jl/Dockerfile fetches and builds
+  that commit and copies his NOTICE, THIRD_PARTY_NOTICES.md and LICENSES into the image (/opt/tensorfold/share/doc/tensorfold);
+  it also fetches TensorFold 0.6.0 (https://github.com/ashhart/TensorFold, commit c4646171139ee8a3c38103eaa1699dad226ec12b) and
+  applies his patches/ to it as the reference tree his asset generators read. His TP RoCE transport (mailbox.cu) adapts the
+  "RoCEnante" all-gather of b12x (https://github.com/local-inference-lab/b12x, Luke Alonso and the b12x contributors,
+  Apache License 2.0). scripts/jl-env.sh (his serving profile), scripts/jl-prepare.sh (his documented asset steps), jl/Dockerfile
+  (his docker/zig/Dockerfile) and the ENGINE=jl branches of start.sh follow those files; the changes are this project's work under
+  Apache-2.0. The NCCL cuMem setting for ENGINE=jl is BobClawblaw's, from his scripts/serve.sh (commit
+  2cd03c862f034d069f4419dc0042c8b2ac0cd433).
+
 DeepSeek-V4.1-Flash-1017
   https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash-1017
   Copyright (c) 2023 DeepSeek. MIT License. Engram's tables (shards 47 and 48) are downloaded by scripts/prepare.sh,
-  not distributed here.
+  not distributed here (ENGINE=jl packs them into per-rank shards with his scripts/pack_engram.py).
 
 DeepSeek-V4.1-Flash-1017-EXL3-EAQ-v1-2.9-bpw
   https://huggingface.co/Mia-AiLab/DeepSeek-V4.1-Flash-1017-EXL3-EAQ-v1-2.9-bpw
