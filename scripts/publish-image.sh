@@ -11,7 +11,7 @@ set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")/.."
 source ./scripts/config.sh
 
-REPO_URL="${REPO_URL:-https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks-TensorFold}"
+REPO_URL="${REPO_URL:-https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks}"
 docker image inspect "$IMAGE" >/dev/null 2>&1 || die "image $IMAGE missing, run scripts/prepare.sh first"
 hash=$(docker image inspect -f '{{index .Config.Labels "tf.patches"}}' "$IMAGE")
 [[ "$hash" == "$(image_hash)" ]] ||
