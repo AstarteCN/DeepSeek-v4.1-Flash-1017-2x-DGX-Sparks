@@ -126,8 +126,8 @@ ENGRAM_AIO="${ENGRAM_AIO:-1}"
 REPLAY_FLOOR="${REPLAY_FLOOR:-1}"
 # zig/patches/0005 (issue #3; pull request #5 by Coinupbtc): milliseconds a long prompt pass gives, between two of its chunks, to decode
 # rounds for the streams already live (and to their cancels): TF_DS_PREFILL_INTERLEAVE_MS, read by rank 0 only. 0: the pass runs to
-# its end first, as before. Each such stop costs the long prompt about the time given.
-PREFILL_INTERLEAVE_MS="${PREFILL_INTERLEAVE_MS:-0}"
+# its end first, as before. 250 is what PR #5 and this recipe measured. Each such stop costs the long prompt about the time given.
+PREFILL_INTERLEAVE_MS="${PREFILL_INTERLEAVE_MS:-250}"
 
 # ---------------------------------------------------------------- files
 HF_CACHE="${HF_CACHE:-${HF_HOME:-$HOME/.cache/huggingface}}"

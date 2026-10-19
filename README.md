@@ -95,15 +95,17 @@ resumes, four at once, a three-conversation scenario; `tools/exact.py`). Each is
 | `TF_DS_ENGRAM_LANES=2` (off) | A second I/O ring for the prompt's Engram reads. Bit-identical, but prefill 1.5-2.6% *slower* from 8K to 131K: the drive is the limit. |
 | `TF_DS_IDX_SPLIT=1` (off) | Splits the prefill indexer's rows between the two ranks. Bit-identical, with no measurable gain on this pair (modeled at +1% at 64K and +2% at 128K; the undisturbed 32K repetitions tie the baseline). If the two ranks ever disagree on the setting the pair hangs, so it stays off. |
 
-Known limits of the engine, from user reports (issues [#2](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/2) and
-[#3](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/3), read in `lanes.zig` and `lane_host.zig` of the pinned engine): a prompt that
-carries images runs whole and keeps nothing ("a kept state knows no images"), so every turn of a conversation with images in its
-history is cold (~90 s at 160K tokens in the report); and a prompt pass runs to completion inside its admission, so other streams
-get no decode round meanwhile and a cancel waits for it (the pin `629c524` only lets streams within 256 tokens of `max_tokens`
-finish, for up to 5 s, after a pass of a second or more; measured on the pair: a decoding stream got no token for 90 s while a 120K-token cold prompt prefilled). Both are in BertholomusAI's engine, not in the recipe's scripts. Until
-they change upstream: keep screenshots out of long agent histories, and do not start a cold long prompt while another chat is
-decoding. `ENGINE=jl` interleaves prompt pieces with other slots' decode (`TF_DSV41_PREFILL_PIECES`); its image prompt reuse
-was not tested here.
+Two limits of BertholomusAI's engine, reported in issues [#2](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/2) and
+[#3](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/3), are patched here (`zig/patches/0005`, `0006`), and measured on the pair
+(engine `629c524` + patches; the replies of 31 `tools/exact.py` prompts, 4 concurrent among them, are identical to the previous image's):
+- **A prompt pass no longer freezes the other streams** (`0005`, by Coinupbtc, pull request #5; `PREFILL_INTERLEAVE_MS`, 250 by default, 0 turns it off): between two
+  chunks of a long prompt pass, the streams already live get decode rounds and their cancels are taken. A 120K-token cold prompt used to leave a decoding
+  stream without a token for 90 s; now its longest gap is 1.3 s, and a cancel is answered 0.74 s after the client leaves, in the middle of the other
+  prompt's pass. The cold prompt itself takes about 10 % longer (99 s against 91 s).
+- **A prompt with pictures resumes and keeps prompt states** (`0006`; `TF_DS_IMAGE_CACHE=0` turns it off): the cache keys the pictures' positions by the
+  picture's content. With a picture first and 27K tokens after it, turn 2 resumed 26,624 tokens in 0.8 s (cold: 14 s); another picture with identical text was
+  cold, and the first picture again hit with a byte-identical reply.
+`ENGINE=jl` interleaves prompt pieces with other slots' decode (`TF_DSV41_PREFILL_PIECES`); its image prompt reuse was not tested here.
 
 What is **not** checked: image input and `tools/validate.py` on this pair; other cabling, hardware or a head with less
 memory to spare; days of uptime; and the engine's behaviour at the memory floor under heavy concurrent long prompts (the
