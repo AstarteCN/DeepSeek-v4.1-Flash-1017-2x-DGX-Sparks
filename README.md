@@ -219,7 +219,7 @@ Settings come from the environment, `scripts/local.sh` or `.env`; the defaults a
 | `HOST`, `PORT`, `SERVED_NAME` | 0.0.0.0, 8888, `DeepSeek-V4.1-Flash-1017-EXL3` | |
 | `WORKER`, `FABRIC_PEER`, `NFS_*` | | see Requirements |
 | `TF_REF`, `INPUTS_REF`, `KIT_REF` | pinned | the engine, the inputs' tools and the kit (changing one rebuilds or re-checks) |
-| `PULL` | 1 | `0` never pulls a published image (`GHCR_IMAGE`, `IMAGE_TAG`, `IMAGE_DIGEST`; none is published yet) |
+| `PULL` | 1 | `0` never pulls a published image (`GHCR_IMAGE`, `IMAGE_TAG`, `IMAGE_DIGEST`; the image of these pins is `ghcr.io/miaai-lab/deepseek-v4.1-flash-1017-2x-dgx-sparks-tensorfold:exl3-tp2-7c9bf5d36350`) |
 
 Extra arguments to `./start.sh` go to rank 0's `tensorfold-native serve` after the defaults; every `TENSORFOLD_*` and
 `TF_DS_*` variable you set goes to both ranks. Images are always on (rank 0 runs the vision tower).
@@ -248,7 +248,7 @@ scripts/nodes.sh             the worker over ssh, the CX7 link and its RoCE rail
 scripts/prepare.sh           image, downloads, kit, token map, weight files, the worker's NFS volume and disk
 scripts/memguard.sh          the memory watchdog start.sh runs on both Sparks (kills a rank's container below MEMGUARD_GIB)
 scripts/zig_flags.py         start.sh's check of rank 0's serve flags against the image's `capabilities --json`
-scripts/publish-image.sh     pushes the built image to ghcr.io (only on purpose; none is published yet)
+scripts/publish-image.sh     pushes the built image to ghcr.io (only on purpose)
 zig/Dockerfile, zig/patches  the engine image; patches to the pinned engine (four)
 model/chat_template.jinja    the chat template rank 0 serves
 tools/validate.py            an end-to-end check of a running server
