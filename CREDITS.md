@@ -102,6 +102,10 @@ License 2.0 ([`LICENSE`](LICENSE)); [`NOTICE`](NOTICE) carries the notices that 
   second AIO ring for Engram reads (0002) and a row split of the prefill indexer between the two ranks (0001). A prompt-cache placement
   patch (0003) was dropped when the pin moved to `629c524`, which places kept states itself. The idea of splitting the indexer is credited to drowzeys, from the GLM-5.3-Flash recipe's design; no code of
   that recipe was used. They modify code by TensorFold's contributors and BertholomusAI, which keeps their licences.
+- **`zig/patches/0005-prefill-interleave.patch`** was authored by **[Coinupbtc](https://github.com/Coinupbtc)** (@Coinupbtc), in [pull request #5](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/pull/5)
+  (commit [`27e02c6`](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/pull/5/commits/27e02c605eae0997ed9161baaf583dd3ad431bb3)) of this repository, for issue #3: between two chunks of a long prompt pass, the other live streams get decode rounds and
+  their cancels are taken (`TF_DS_PREFILL_INTERLEAVE_MS`), with its host test and the bit-identity runs in the pull request. It is carried here as it
+  was sent; **`zig/patches/0006-image-prompt-cache.patch`** (issue #2) was written for this recipe on top of it.
 - **`zig/patches/0004-call-gate.patch`** (`tool_choice` enforcement) was written by Mia's AI Lab (Apache-2.0). Its new file,
   `zig/src/core/lanes/call_gate.zig`, is Mia's AI Lab's Zig call gate for the Flash Next CUDA engine (commits `49350ed6` and
   `c948979c` of 2026-10-07, with fixes `06cbbf72` and `1b082936`), which is itself a port of the call gate in TensorFold's

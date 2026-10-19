@@ -9,7 +9,7 @@ vocabulary id: the same picture always makes the same ids, a different picture n
 expanded prompt; the host looks up and keeps by that key; the backend restores a state like any other and, resuming at its end, gives
 the tower and the follower the rows only of the pictures the pass still embeds (a picture wholly before the cut is in the state;
 its positions stay dead for Engram's n-grams). A request with pictures and no key (Request.cache_key empty) is refused by the cache as
-before, so a server without the key can never match two different pictures.
+before, so a server without the key can never match two different pictures. Applies after 0005 (the prefill interleave).
 
 Switch: TF_DS_IMAGE_CACHE=0 (server) turns it off: no key, no history length, pictures resume and keep nothing as before. Unset = on.
 Adds host tests (a picture's conversation resumes its state, another picture in the same positions does not, a request without a key
@@ -32,10 +32,10 @@ index db84803..1234369 100644
      sampling: ?Sampling = null,
      /// Tokens that end the reply as ``stop`` (the token is delivered); empty when the request ignores EOS.
 diff --git a/zig/src/core/lane_host.zig b/zig/src/core/lane_host.zig
-index b364ddf..3aeb30d 100644
+index 09ef369..99177d2 100644
 --- a/zig/src/core/lane_host.zig
 +++ b/zig/src/core/lane_host.zig
-@@ -85,8 +85,8 @@ pub const LaneHost = struct {
+@@ -86,8 +86,8 @@ pub const LaneHost = struct {
          fn kept(ptr: *anyopaque, s: *lanes.Stream, at: u32) void {
              const job: *Job = @ptrCast(@alignCast(ptr));
              job.reported(); // before a keep can evict the entry the pass restored
@@ -46,7 +46,7 @@ index b364ddf..3aeb30d 100644
          }
  
          /// Report a restored prefix or its failed copy; an untouched prefix remains kept.
-@@ -96,10 +96,22 @@ pub const LaneHost = struct {
+@@ -97,10 +97,22 @@ pub const LaneHost = struct {
              const store = job.host.cache orelse return;
              if (!job.started) return;
              job.stream.reuse.saved = null; // the backend restores before its first chunk; a later keep may free it
@@ -70,7 +70,7 @@ index b364ddf..3aeb30d 100644
      pub fn init(gpa: Allocator, io: std.Io, core: *lanes.Engine, info_: Info) LaneHost {
          var enforced = info_;
          enforced.loop_guard = true;
-@@ -348,7 +360,7 @@ pub const LaneHost = struct {
+@@ -340,7 +352,7 @@ pub const LaneHost = struct {
          const r = job.request;
          var reuse: lanes.stream.Reuse = .{};
          // the entry stays alive until the backend restores it: nothing keeps between here and this stream's own pass
@@ -179,7 +179,7 @@ index 530e365..963ba7e 100644
 +    try std.testing.expectEqual(kept_before, store.entries.items.len);
 +}
 diff --git a/zig/src/families/dsv41/lanes.zig b/zig/src/families/dsv41/lanes.zig
-index aecf435..a3d8620 100644
+index 6001403..2c76760 100644
 --- a/zig/src/families/dsv41/lanes.zig
 +++ b/zig/src/families/dsv41/lanes.zig
 @@ -450,8 +450,9 @@ pub const Lanes = struct {
@@ -217,9 +217,9 @@ index aecf435..a3d8620 100644
              start += n;
 -            if (s.images.len == 0) if (s.reuse.hook) |k| if (start < len and start <= replay and (start == last_end or markEnds(s.reuse.marks, start))) k.at(k.ptr, s, @intCast(start));
 +            if (s.reuse.hook) |k| if (start < len and start <= replay and (start == last_end or markEnds(s.reuse.marks, start))) k.at(k.ptr, s, @intCast(start));
-             // TF_DS_PREFILL_YIELD: the host may run decode rounds for the streams already live between two chunks (never after the
-             // last: the prompt's logits sit in the chunk workspace a round would overwrite). The next chunk's Engram read-ahead is
-             // joined first and the fill's ids hidden while the rounds run, as the follower does for any frame but a chunk's; both
+             // prefill interleave: the other streams' rounds between this pass's chunks (verify frames go to rank 1 in
+             // order; every state a pass carries from chunk to chunk is the slot's, except the Engram read-ahead, which
+             // a round's own Engram reads would race: joined first, its rows kept for the next chunk)
 diff --git a/zig/src/server/chat.zig b/zig/src/server/chat.zig
 index b635b64..91dadbb 100644
 --- a/zig/src/server/chat.zig

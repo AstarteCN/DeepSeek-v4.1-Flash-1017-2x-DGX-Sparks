@@ -124,9 +124,10 @@ ENGRAM_AIO="${ENGRAM_AIO:-1}"
 # TF_DS_REPLAY_FLOOR=1 is the family's served setting: a last prompt chunk of 16 rows or fewer reads its window from the
 # replay cut, not from the previous request's keys. It goes to both ranks.
 REPLAY_FLOOR="${REPLAY_FLOOR:-1}"
-# zig/patches/0005 (issue #3): decode rounds a long prompt pass lets the streams already live have between two of its chunks, and the
-# point where it answers their cancels (TF_DS_PREFILL_YIELD, read by rank 0 only). 0: the pass runs to its end first, as before.
-PREFILL_YIELD="${PREFILL_YIELD:-0}"
+# zig/patches/0005 (issue #3; pull request #5 by Coinupbtc): milliseconds a long prompt pass gives, between two of its chunks, to decode
+# rounds for the streams already live (and to their cancels): TF_DS_PREFILL_INTERLEAVE_MS, read by rank 0 only. 0: the pass runs to
+# its end first, as before. Each such stop costs the long prompt about the time given.
+PREFILL_INTERLEAVE_MS="${PREFILL_INTERLEAVE_MS:-0}"
 
 # ---------------------------------------------------------------- files
 HF_CACHE="${HF_CACHE:-${HF_HOME:-$HOME/.cache/huggingface}}"
