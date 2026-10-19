@@ -16,6 +16,8 @@
 # ./start.sh runs this by itself when needed. Safe to re-run: every step skips work that is already done.
 # Pass --rebuild to rebuild the image from scratch; PULL=0 never pulls a published image. VERIFY_SHA=1 also checks Engram's shards against the sha256 the
 # checkpoint's model card lists (a few minutes of reading 203 GB).
+# ABLIT=1 applies Keys' matching Mia EAQ 2.9 bpw overlay in a separate folder. Requires your Hugging Face read token
+# (HF_TOKEN or hf auth login) AND access to https://huggingface.co/drowzeys/keys-DeepSeek-V4.1-Flash-1017-Abliterated.
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")/.."
 source ./scripts/config.sh
@@ -29,11 +31,21 @@ for arg in "$@"; do
     *) die "unknown argument: $arg" ;;
   esac
 done
+ablit_notice
 
 # ---------------------------------------------------------------- 1. preflight
 mkdir -p "$STATE_DIR" "$HF_CACHE/hub"
 exec 9>"$STATE_DIR/prepare.lock"
 flock -n 9 || die "another prepare.sh is already running; wait for it or stop it: pgrep -af prepare.sh"
+# Check gated access before building images or downloading hundreds of GB. hf uses HF_TOKEN or its saved login;
+# never pass the token as an argument or forward it to the worker or serving containers.
+if [[ "$ABLIT" == 1 ]]; then
+  command -v hf >/dev/null || die "install the Hugging Face CLI: pip install -U huggingface_hub"
+  log "Downloading the matching Mia 2.9 bpw overlay from $ABLIT_ID @ ${ABLIT_REVISION:0:8}"
+  hf download "$ABLIT_ID" --revision "$ABLIT_REVISION" --cache-dir "$HF_CACHE/hub" \
+    --include apply_mia29_wo_b_graft.py --include "$ABLIT_SIDECAR" --include EXL3_MIA29_ABLIT_META.json --include README.md >/dev/null || \
+    die "cannot download the gated overlay: use your HF read token (HF_TOKEN or hf auth login) and obtain access at https://huggingface.co/$ABLIT_ID"
+fi
 log "Preflight checks on both Sparks"
 command -v docker >/dev/null || die "docker is not installed"
 docker info >/dev/null 2>&1 || die "cannot talk to the docker daemon (is your user in the docker group?)"
@@ -129,6 +141,34 @@ log "Engram: $ESNAP ($(du -shL "$ESNAP" | cut -f1))"
 # a container's view of HF_CACHE (the snapshot's files are links into ../../blobs)
 in_hf() { docker run --rm --network none --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$HF_CACHE:/hf" "$@"; }
 
+# Apply before either rank's cache is built: the index hash alone cannot distinguish changed tensor contents.
+if [[ "$ABLIT" == 1 ]]; then
+  overlay_sub="hub/models--${ABLIT_ID//\//--}/snapshots/$ABLIT_REVISION"
+  for f in apply_mia29_wo_b_graft.py "$ABLIT_SIDECAR" EXL3_MIA29_ABLIT_META.json; do
+    [[ -s "$HF_CACHE/$overlay_sub/$f" ]] || die "matching Mia overlay file is missing: $f"
+  done
+  mkdir -p "$DATA_DIR"
+  if [[ ! -f "$DATA_DIR/checkpoint/.ablit-ready" ]]; then
+    log "Applying the Mia EAQ 2.9 bpw overlay in $DATA_DIR/checkpoint (stock stays intact; changed shards need extra disk)"
+    rm -rf "$DATA_DIR/checkpoint.new" "$DATA_DIR/stock.new"
+    mkdir -p "$DATA_DIR/stock.new"
+    # Dereference HF's relative blob symlinks before upstream hardlinks unchanged shards into the destination.
+    cp -alL "$SNAP/." "$DATA_DIR/stock.new/"
+    in_hf --entrypoint python3 "$IMAGE" "/hf/$overlay_sub/apply_mia29_wo_b_graft.py" \
+      --src "/hf/$DATA_SUB/stock.new" --dst "/hf/$DATA_SUB/checkpoint.new" \
+      --wo-b "/hf/$overlay_sub/$ABLIT_SIDECAR" || die "applying the matching Mia overlay failed; rerun prepare.sh to retry"
+    python3 -I -c 'import json,sys; m=json.load(open(sys.argv[1])); assert m["n_edited"] == 104, "expected 104 Mia overlay tensors"' \
+      "$DATA_DIR/checkpoint.new/ABLIT_META.json" || die "Mia overlay did not replace all 104 tensors"
+    touch "$DATA_DIR/checkpoint.new/.ablit-ready"
+    rm -rf "$DATA_DIR/checkpoint"
+    mv "$DATA_DIR/checkpoint.new" "$DATA_DIR/checkpoint"
+    rm -rf "$DATA_DIR/stock.new"
+  else
+    log "Matching Mia overlay checkpoint: ready"
+  fi
+  SNAP="$DATA_DIR/checkpoint"
+fi
+
 # ---------------------------------------------------------------- 4. the kit
 KIT_DIR="$HF_CACHE/$KIT_SUB"
 if [[ ! -d "$KIT_DIR/.git" ]]; then
@@ -186,7 +226,9 @@ fi
 # recipe's chat template
 VIEW="$DATA_DIR/model"
 rm -rf "$VIEW.new" && mkdir -p "$VIEW.new"
-for f in "$SNAP"/*; do ln -s "../../../hub/models--${MODEL_ID//\//--}/snapshots/$(snapshot_rev)/$(basename "$f")" "$VIEW.new/"; done
+for f in "$SNAP"/*; do ln -s "$(realpath -s --relative-to="$VIEW.new" "$f")" "$VIEW.new/"; done
+# Never copy through a snapshot's chat-template symlink into stock or grafted weights.
+rm -f "$VIEW.new/chat_template.jinja"
 cp model/chat_template.jinja "$VIEW.new/chat_template.jinja"
 rm -rf "$VIEW" && mv "$VIEW.new" "$VIEW"
 [[ -s "$VIEW/config.json" ]] || die "the served folder $VIEW does not reach the checkpoint"

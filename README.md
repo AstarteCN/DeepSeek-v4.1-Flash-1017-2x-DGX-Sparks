@@ -21,6 +21,8 @@ or off, and **DSpark** speculative decoding from the checkpoint's own draft bloc
 - API model id: `DeepSeek-V4.1-Flash-1017`, port 8888
 - Engine: TensorFold native (Zig 0.17.0), BertholomusAI's `dsv41` family at TP=2, one rank on each Spark
 - One command on the first Spark: `./start.sh` sets up both Sparks and starts both ranks; `./stop.sh` stops them
+- Optional `ABLIT=1`: keeps Mia EAQ 2.9 bpw and applies the matching [Keys overlay by drowzeys](https://huggingface.co/drowzeys/keys-DeepSeek-V4.1-Flash-1017-Abliterated).
+  Requires your Hugging Face token and access to that gated repository; see [Abliterated mode](#abliterated-mode).
 
 ## Status
 
@@ -174,6 +176,60 @@ API_URL=http://<head-address>:8888 python3 tools/toolcheck.py    # also needle.p
 `stop.sh` saves each rank's log (gzipped, newest 10 kept, `LOG_KEEP`) to `~/.cache/dsv41-tensorfold/logs` before it removes
 the container.
 
+## Abliterated mode
+
+`ABLIT` accepts **`0` or `1`** (default `0`). Set it in the environment, `scripts/local.sh` or `.env`.
+`ABLIT=0` serves the stock Mia EAQ v1 2.9 bpw checkpoint. `ABLIT=1` keeps that checkpoint and applies
+`exl3_wo_b_l10_35_mia29.safetensors` from
+[`drowzeys/keys-DeepSeek-V4.1-Flash-1017-Abliterated`](https://huggingface.co/drowzeys/keys-DeepSeek-V4.1-Flash-1017-Abliterated).
+This repository supplies overlays, not a full checkpoint. The recipe uses its **matching Mia 2.9 bpw** overlay and
+`apply_mia29_wo_b_graft.py`; the FP8, LibertAI 3.5 bpw and Jayleaton 2.8 bpw sidecars are for other packs.
+
+Before preparing or starting with `ABLIT=1`:
+
+1. Log in to Hugging Face and obtain access by accepting the terms on the
+   [gated repository page](https://huggingface.co/drowzeys/keys-DeepSeek-V4.1-Flash-1017-Abliterated).
+2. Use a Hugging Face read token from **the same account**, with permission to read that gated repository.
+   Authenticate on the head with `hf auth login`, or export `HF_TOKEN` as below. A token alone does not grant repository access.
+
+```bash
+hf auth login                 # enter your HF read token, after obtaining repository access
+ABLIT=1 ./scripts/prepare.sh   # optional: prepare separately; start.sh also prepares automatically
+ABLIT=1 ./start.sh restart    # restart both ranks with the overlay
+ABLIT=0 ./start.sh restart    # switch back to stock
+```
+
+Alternatively, supply your token through the environment without writing it into a command's history:
+
+```bash
+read -rsp 'Hugging Face read token: ' HF_TOKEN; echo
+export HF_TOKEN
+ABLIT=1 ./start.sh restart
+unset HF_TOKEN
+```
+
+Both `scripts/prepare.sh` and `start.sh` print the token and gated-access requirement when `ABLIT=1`, including a link
+to the repository. Preparation downloads the matching overlay before the image build and large checkpoint downloads,
+and reports an access error if the download fails. `hf` uses the token on the head; the recipe does not pass `HF_TOKEN`
+in command arguments or forward it as an environment variable to the worker or serving containers. A saved login token
+inside `HF_CACHE` is part of the shared cache; use `HF_TOKEN` or a token path outside that cache to keep it out of the mounts.
+`DRY_RUN=1 ABLIT=1 ./start.sh` prints the notice without downloading or checking access.
+
+The overlay is pinned at `0bdc2036113c4fdda38ef6005b3cbc0bc0dfa0f0` (`ABLIT_REVISION`, a full commit hash).
+It replaces 104 attention tensors in layers 10–35. Its application script also converts four MTP tensors to F32 for Zig
+compatibility, as described in the upstream `TENSORFOLD-ZIG-MIA.md`. The stock Hugging Face snapshot stays intact:
+preparation hardlinks unchanged shards and writes changed shards under a separate
+`$HF_CACHE/tensorfold-dsv41/<model-revision>-ablit-<overlay-revision>/checkpoint` directory. **Allow extra disk space for
+rewritten shards (up to another checkpoint's size), the ~651 MiB sidecar, and a separate ~106 GB rank cache on each Spark.**
+Applying the overlay runs on CPU using the image's Python, PyTorch and safetensors.
+
+Both ranks build their caches from the modified checkpoint. Abliterated data and worker cache paths include the overlay
+revision, including when `WORKER_CACHE_DIR` is customized, so stock caches cannot be reused accidentally. Keep the same
+`ABLIT` setting for preparation and startup; put `ABLIT=1` in your local configuration to make it persistent. Use
+`restart` when switching modes on a running server. Startup checks both running containers' mode and overlay revision;
+a separately prepared checkpoint cannot make a stock server count as abliterated. The API model name remains `SERVED_NAME`.
+The stock performance and correctness results above do not validate the abliterated mode on this recipe's engine.
+
 ## What `start.sh` and `scripts/prepare.sh` do
 
 `scripts/prepare.sh` (run by `start.sh` when something is missing; safe to re-run) on the head:
@@ -202,6 +258,9 @@ Settings come from the environment, `scripts/local.sh` or `.env`; the defaults a
 
 | Setting | Default | |
 | --- | --- | --- |
+| `ABLIT` | 0 | `0`: stock Mia EAQ 2.9 bpw; `1`: apply the matching gated Keys overlay; requires your HF token and repository access (see Abliterated mode) |
+| `ABLIT_REVISION` | `0bdc2036113c4fdda38ef6005b3cbc0bc0dfa0f0` | pinned Keys overlay and application script; full commit hash |
+| `HF_TOKEN` | unset | Hugging Face read token for downloads; alternatively authenticate with `hf auth login` on the head |
 | `CONTEXT` | 1048576 | a request's positions at most; rank 1's `--pool` follows it |
 | `PARALLEL` | 4 | requests at once (the engine's streams, 1 to 16; the family was measured at 4) |
 | `THINKING`, `REASONING_EFFORT` | 1, empty | think first unless a request turns it off; `low` / `medium` / `high` / `xhigh` as the default effort |
@@ -278,6 +337,9 @@ third-party parts keep theirs ([`NOTICE`](NOTICE)).
   per-tensor widths it equals, and the chat template (`model/chat_template.jinja`, written for that earlier release).
 - **[turboderp](https://github.com/turboderp-org)**: [ExLlamaV3](https://github.com/turboderp-org/exllamav3), the EXL3 format
   and its quantizer (MIT).
+- **[drowzeys](https://huggingface.co/drowzeys)**: authored the optional [Keys abliteration overlay and Mia EAQ 2.9 bpw
+  application script](https://huggingface.co/drowzeys/keys-DeepSeek-V4.1-Flash-1017-Abliterated/tree/0bdc2036113c4fdda38ef6005b3cbc0bc0dfa0f0)
+  used by `ABLIT=1` (MIT).
 - **[TensorFold](https://github.com/ashhart/TensorFold)** by Ash Hart ([ashhart](https://github.com/ashhart)) and the
   TensorFold contributors (Apache-2.0): the native Zig engine and its OpenAI-compatible server.
 - **[BertholomusAI (Albert Lee, @bertholomus)](https://github.com/bertholomus)** (Apache-2.0): the DeepSeek-V4.1-Flash

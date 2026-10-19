@@ -12,6 +12,7 @@
 #                               # images); if the server already runs, says so and leaves it alone
 #   ./start.sh restart          # stop both ranks (./stop.sh), then start again (e.g. after changing settings)
 #   CONTEXT=262144 ./start.sh restart
+#   ABLIT=1 ./start.sh restart   # Mia EAQ 2.9 bpw + Keys overlay; requires your HF token and gated repo access
 #   API_KEY=1 ./start.sh restart  # require an API key (generated in $STATE_DIR/api-key, mode 600; see scripts/config.sh)
 #   FOREGROUND=1 ./start.sh       # stay attached to rank 0's log and exit with its code (for systemd Restart=on-failure)
 #   DRY_RUN=1 ./start.sh        # print the link found and both ranks' docker commands, change nothing and start nothing
@@ -21,7 +22,7 @@
 #   serving  CONTEXT, PARALLEL, ROUND_ROWS, MAX_TOKENS, THINKING, REASONING_EFFORT, TEMPERATURE, TOP_P, TOP_K, DRAFTS,
 #            SERVED_NAME, HOST, PORT, RDMA, GRAPHS, SIDE, PREFETCH, ENGRAM_AIO, REPLAY_FLOOR
 #   nodes    WORKER, FABRIC_PEER, MASTER_ADDR, MASTER_PORT, SOCKET_IFNAME, NCCL_RAILS, NCCL_DEBUG
-#   files    MODEL_ID, MODEL_REVISION, ENGRAM_ID, ENGRAM_REVISION, HF_CACHE, NFS_PATH, NFS_SERVER, NFS_VOLUME,
+#   files    ABLIT (0 | 1), ABLIT_REVISION, MODEL_ID, MODEL_REVISION, ENGRAM_ID, ENGRAM_REVISION, HF_CACHE, NFS_PATH, NFS_SERVER, NFS_VOLUME,
 #            WORKER_ENGRAM_DIR, WORKER_CACHE_DIR, STATE_DIR, LOG_DIR, LOG_KEEP
 #   engine   TF_REPO, TF_REF, INPUTS_REF, KIT_REPO, KIT_REF, ZIG_VERSION, BASE_IMAGE, IMAGE, CONTAINER_NAME
 #   setup    PREPARE (auto | 1 | 0), WAIT_TIMEOUT (seconds, default 2400), DRY_RUN=1
@@ -41,6 +42,7 @@ case "${1:-}" in
   restart) MODE=restart; shift ;;
   help|-h|--help) usage; exit 0 ;;
 esac
+ablit_notice
 DRY=0; [[ "${DRY_RUN:-0}" == 1 ]] && DRY=1
 for v in CONTEXT PARALLEL MAX_TOKENS TOP_K; do [[ "${!v}" =~ ^[1-9][0-9]*$ ]] || die "$v is a positive count, not ${!v}"; done
 (( CONTEXT <= 1048576 )) || die "CONTEXT is at most 1048576 (the model's window), not $CONTEXT"
@@ -86,6 +88,16 @@ URL="http://$API_HOST:$PORT"
 running_here()   { [[ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)" == true ]]; }
 running_worker() { [[ "$(worker "$1" docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)" == true ]]; }
 if (( ! DRY )) && [[ "$MODE" == start ]] && running_here && running_worker 1; then
+  # Preparation may have run separately while the old server stayed up: inspect the live ranks too.
+  live_head=$(docker inspect -f '{{index .Config.Labels "tf.recipe.ablit"}}' "$CONTAINER_NAME")
+  live_worker=$(worker 1 "docker inspect -f '{{index .Config.Labels \"tf.recipe.ablit\"}}' '$CONTAINER_NAME'")
+  # Containers launched before this flag existed are stock.
+  [[ -n "$live_head" && "$live_head" != '<no value>' ]] || live_head=0
+  [[ -n "$live_worker" && "$live_worker" != '<no value>' ]] || live_worker=0
+  [[ "$live_head" == "$(ablit_identity)" && "$live_worker" == "$(ablit_identity)" ]] || \
+    die "the running ranks use a different ABLIT mode or overlay revision; run ./start.sh restart with ABLIT=$ABLIT"
+  [[ "$(prepared_state 2>/dev/null)" == "$(cat "$PREPARED_MARKER" 2>/dev/null)" ]] || \
+    die "the requested configuration differs from the prepared server; run ./start.sh restart with the same settings (including ABLIT)"
   log "$CONTAINER_NAME is already running on both Sparks (port $PORT): nothing to do. ./start.sh restart restarts it, ./stop.sh stops it."
   exit 0
 fi
@@ -183,7 +195,7 @@ ENGINE_ENV=("TF_DS_REPLAY_FLOOR=$REPLAY_FLOOR" "TF_DS_STREAMS=$PARALLEL" "HF_HUB
 [[ -z "$ROUND_ROWS" ]] || ENGINE_ENV+=("TF_DS_ROUND_ROWS=$ROUND_ROWS")
 while IFS='=' read -r name _; do ENGINE_ENV+=("$name=${!name}"); done < <(env | grep -E '^(TENSORFOLD|TF_DS)_[A-Z0-9_]+=' | grep -vE '^TF_DS_(REPLAY_FLOOR|STREAMS|ROUND_ROWS|GRAPHS|HC_SIDE|L2_PREFETCH|ENGRAM_AIO|RANK_CACHE|KIT|ENGRAM|TOKEN_MAP)=' || true)
 envs() { local x; for x in "$@"; do printf -- '-e %q ' "$x"; done; }
-RUN_ARGS="--gpus all --ipc=host --network host --ulimit memlock=-1 --ulimit stack=67108864 --cap-add IPC_LOCK --device /dev/infiniband"
+RUN_ARGS="--label tf.recipe.ablit=$(ablit_identity) --gpus all --ipc=host --network host --ulimit memlock=-1 --ulimit stack=67108864 --cap-add IPC_LOCK --device /dev/infiniband"
 DATA=/hf/$DATA_SUB
 KIT=/hf/$KIT_SUB/kit
 # rank 1 takes the round's settings as flags only (tf-dsv41-lanes reads no TF_DS_GRAPHS & co.): without them it runs

@@ -45,6 +45,11 @@ SOCKET_IFNAME="${SOCKET_IFNAME:-}"     # NCCL's bootstrap socket's netdev on bot
 MODEL_ID="${MODEL_ID:-Mia-AiLab/DeepSeek-V4.1-Flash-1017-EXL3-EAQ-v1-2.9-bpw}"
 _rev=""; [[ "$MODEL_ID" == Mia-AiLab/DeepSeek-V4.1-Flash-1017-EXL3-EAQ-v1-2.9-bpw ]] && _rev=6d54be4fca338d79b17c3b03cc9a423bb3ac6718
 MODEL_REVISION="${MODEL_REVISION-$_rev}"
+# Keys' matching Mia EAQ 2.9 bpw overlay (not a standalone checkpoint).
+export ABLIT="${ABLIT:-0}"
+ABLIT_ID=drowzeys/keys-DeepSeek-V4.1-Flash-1017-Abliterated
+ABLIT_REVISION="${ABLIT_REVISION:-0bdc2036113c4fdda38ef6005b3cbc0bc0dfa0f0}"
+ABLIT_SIDECAR=exl3_wo_b_l10_35_mia29.safetensors
 ENGRAM_ID="${ENGRAM_ID:-deepseek-ai/DeepSeek-V4.1-Flash-1017}"
 _erev=""; [[ "$ENGRAM_ID" == deepseek-ai/DeepSeek-V4.1-Flash-1017 ]] && _erev=1bae0e1088993b9b82de08f59de5be5a34e42170
 ENGRAM_REVISION="${ENGRAM_REVISION-$_erev}"
@@ -125,6 +130,7 @@ HF_CACHE="${HF_CACHE:-${HF_HOME:-$HOME/.cache/huggingface}}"
 # What the ranks read besides the checkpoint: rank 0's weight file, Engram's token map and the kernel kit, under HF_CACHE
 # so that one NFS export serves the worker too.
 DATA_SUB="tensorfold-dsv41/${MODEL_REVISION:0:8}"
+[[ "$ABLIT" != 1 ]] || DATA_SUB+="-ablit-${ABLIT_REVISION:0:8}"
 DATA_DIR="$HF_CACHE/$DATA_SUB"
 KIT_SUB="tensorfold-dsv41/kit-${KIT_REF:0:8}"
 # The worker reads this Spark's HF_CACHE over NFS (the recipe's only mode: one copy of the 196 GiB checkpoint, here): a
@@ -139,6 +145,10 @@ NFS_VOLUME="${NFS_VOLUME:-dsv41-1017-exl3-hf}"
 # checkpoint over NFS, so it never crosses the network twice).
 WORKER_ENGRAM_DIR="${WORKER_ENGRAM_DIR:-\$HOME/.cache/dsv41-tensorfold/engram-${ENGRAM_REVISION:0:8}}"
 WORKER_CACHE_DIR="${WORKER_CACHE_DIR:-\$HOME/.cache/dsv41-tensorfold/rank-cache-${MODEL_REVISION:0:8}}"
+# Keep stock and abliterated weights separate even when the user sets WORKER_CACHE_DIR.
+if [[ "$ABLIT" == 1 && "$WORKER_CACHE_DIR" != *"-ablit-${ABLIT_REVISION:0:8}" ]]; then
+  WORKER_CACHE_DIR+="-ablit-${ABLIT_REVISION:0:8}"
+fi
 STATE_DIR="${STATE_DIR:-$HOME/.local/state/dsv41-tensorfold}"   # locks and the prepared marker
 LOG_DIR="${LOG_DIR:-$HOME/.cache/dsv41-tensorfold/logs}"
 LOG_KEEP="${LOG_KEEP:-10}"
@@ -173,6 +183,17 @@ warn() { printf '%s[%s] WARN:%s %s\n' "$(_c 2 '1;33')" "$(basename "$0")" "$(_c 
 die()  { printf '%s[%s] ERROR:%s %s\n' "$(_c 2 '1;31')" "$(basename "$0")" "$(_c 2 0)" "$*" >&2; exit 1; }
 
 [[ -z "${HF_TOKEN:-}" ]] || export HF_TOKEN
+ablit_notice() {
+  [[ "$ABLIT" =~ ^[01]$ ]] || die "ABLIT is 0 or 1, not $ABLIT"
+  [[ "$ABLIT" == 1 ]] || return 0
+  case "$MODEL_ID" in
+    Mia-AiLab/DeepSeek-V4.1-Flash-1017-EAQ-v1-2.9-bpw|Mia-AiLab/DeepSeek-V4.1-Flash-1017-EXL3-EAQ-v1-2.9-bpw) ;;
+    *) die "ABLIT=1 requires the Mia EAQ v1 2.9 bpw checkpoint and its matching $ABLIT_SIDECAR overlay" ;;
+  esac
+  [[ "$ABLIT_REVISION" =~ ^[0-9a-f]{40}$ ]] || die "ABLIT_REVISION must be a full Hugging Face commit hash"
+  warn "ABLIT=1: $ABLIT_ID is gated. You must have access at https://huggingface.co/$ABLIT_ID (accept its terms while logged in) and use your Hugging Face read token: export HF_TOKEN=hf_... or hf auth login. The token's account must have access to this repository."
+}
+ablit_identity() { if [[ "$ABLIT" == 1 ]]; then echo "1@$ABLIT_REVISION"; else echo 0; fi; }
 hub_dir()         { echo "$HF_CACHE/hub/models--${1//\//--}"; }
 model_cache_dir() { hub_dir "$MODEL_ID"; }
 engram_cache_dir() { hub_dir "$ENGRAM_ID"; }
@@ -180,7 +201,10 @@ engram_cache_dir() { hub_dir "$ENGRAM_ID"; }
 snapshot_rev() { local rev=$MODEL_REVISION; [[ -n "$rev" ]] || rev=$(cat "$(model_cache_dir)/refs/main" 2>/dev/null); echo "$rev"; }
 engram_rev()   { local rev=$ENGRAM_REVISION; [[ -n "$rev" ]] || rev=$(cat "$(engram_cache_dir)/refs/main" 2>/dev/null); echo "$rev"; }
 # The checkpoint and the Engram folder as the containers see them (HF_CACHE mounted at /hf on both Sparks).
-model_in_container()  { echo "/hf/hub/models--${MODEL_ID//\//--}/snapshots/$(snapshot_rev)"; }
+model_in_container()  {
+  if [[ "$ABLIT" == 1 ]]; then echo "/hf/$DATA_SUB/checkpoint"
+  else echo "/hf/hub/models--${MODEL_ID//\//--}/snapshots/$(snapshot_rev)"; fi
+}
 engram_in_container() { echo "/hf/hub/models--${ENGRAM_ID//\//--}/snapshots/$(engram_rev)"; }
 # The folder rank 0 serves (prepare.sh): the checkpoint's files linked, with the recipe's chat template.
 served_in_container() { echo "/hf/$DATA_SUB/model"; }
@@ -189,7 +213,8 @@ served_in_container() { echo "/hf/$DATA_SUB/model"; }
 PREPARED_MARKER="$STATE_DIR/prepared"
 prepared_state() {
   echo "model=$MODEL_ID@$(snapshot_rev) engram=$ENGRAM_ID@$(engram_rev) image=$(image_ident "$IMAGE") kit=$KIT_REF" \
-       "w=$(worker_host 1) wengram=$WORKER_ENGRAM_DIR wcache=$WORKER_CACHE_DIR"
+       "w=$(worker_host 1) wengram=$WORKER_ENGRAM_DIR wcache=$WORKER_CACHE_DIR ablit=$ABLIT" \
+       "overlay=$( [[ "$ABLIT" == 1 ]] && echo "$ABLIT_ID@$ABLIT_REVISION" || echo none)"
 }
 
 # ---------------------------------------------------------------- API key

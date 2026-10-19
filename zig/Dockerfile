@@ -13,6 +13,8 @@
 # zig/patches only.
 ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:26.07-py3
 FROM ${BASE_IMAGE}
+# Optional ABLIT preparation uses the image's PyTorch and safetensors on CPU.
+RUN python3 -m pip install --no-cache-dir safetensors
 ARG ZIG_VERSION
 ARG ZIG_SHA256
 RUN curl -fsSL -o /tmp/zig.tar.xz "https://ziglang.org/download/${ZIG_VERSION}/zig-aarch64-linux-${ZIG_VERSION}.tar.xz" && \
