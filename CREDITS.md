@@ -77,7 +77,11 @@ License 2.0 ([`LICENSE`](LICENSE)); [`NOTICE`](NOTICE) carries the notices that 
   file's format and permission rule are the engine's (`zig/src/server/auth.zig` in TensorFold, Apache-2.0).
 - **`model/chat_template.jinja`** was written by Mia's AI Lab ([Mia-AiLab](https://huggingface.co/Mia-AiLab)) for
   [`Mia-AiLab/DeepSeek-V4.1-Flash-EXL3-2.9bpw`](https://huggingface.co/Mia-AiLab/DeepSeek-V4.1-Flash-EXL3-2.9bpw): a Jinja
-  port of the checkpoint's own `encoding/encoding.py` (DeepSeek, MIT). The file here is that file, unchanged.
+  port of the checkpoint's own `encoding/encoding.py` (DeepSeek, MIT). The file here is that file with one change, by
+  **hashd1ve** ([hashd1ve](https://github.com/hashd1ve), issue
+  [#1](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/1)): each piece of the prompt is written out
+  as it is made (`{{- "" + X -}}`) instead of being added to one growing string (`{% set ns.out = ns.out + X %}`), which the
+  `dsv41` engine copied on every append. hashd1ve wrote the change and checked that the rendered prompt is unchanged.
 - **`tools/validate.py`** was written by Mia's AI Lab for the four-Spark DeepSeek-V4.1-Flash-1017 recipe.
 - Taken from the GLM-5.3-Flash recipe, with the model name and the native server's reply fields changed:
   `tools/client.py`, `tools/toolcheck.py` and `tools/needle.py` by Mia's AI Lab; `tools/end_of_turn.py` by

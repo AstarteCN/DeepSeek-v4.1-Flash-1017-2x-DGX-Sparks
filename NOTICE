@@ -40,6 +40,8 @@ DeepSeek-V4.1-Flash-1017-EXL3-EAQ-v1-2.9-bpw
 Chat template (model/chat_template.jinja)
   https://huggingface.co/Mia-AiLab/DeepSeek-V4.1-Flash-EXL3-2.9bpw
   Written by Mia's AI Lab (Mia-AiLab): a port of the checkpoint's encoding/encoding.py (DeepSeek, MIT) to Jinja.
+  One change, by hashd1ve (https://github.com/hashd1ve): each piece of the prompt is written out as it is made, not added
+  to one growing string (issue #1 of this repository).
 
 GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold
   https://github.com/MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold

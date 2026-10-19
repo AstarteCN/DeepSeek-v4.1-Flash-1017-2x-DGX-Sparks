@@ -13,6 +13,10 @@
   the GLM Python engine's `/health` counters or its prompt cache, patches or settings: `tools/hermes_benchmark.py`,
   the pool, kept-state, display-KV and CPU/GPU tests, the spill tier, `SHARED_PREFIX`, the three and four Spark scripts,
   and the Ablit weights. (`tools/prompt_reuse.py` is ported since, with its cached-token lookup adapted.)
+- `model/chat_template.jinja` writes each piece of the prompt out as it is made instead of adding it to one growing
+  string (fix by hashd1ve, issue #1): rank 0's host memory no longer grows with messages x prompt length (40K tokens in
+  2,000 messages: +1,555 MiB before, +244 MiB after, as the issue measured). The rendered prompt is identical (3,000 random
+  conversations compared on jinja2).
 - `stop.sh` counts running requests from the native server's `/health` (`live.connections`).
 - Served and measured on one pair of Sparks (README, Status). With sparkDash's real prompts:
   prefill ~2,140-2,180 tok/s from 8K to 64K prompts (2,000 at 256K), decode 74.9 tok/s (prose) and 109.9 tok/s

@@ -300,6 +300,9 @@ third-party parts keep theirs ([`NOTICE`](NOTICE)).
   (workers by host name; `tools/end_of_turn.py`) and john (each rank's rendezvous address); `tools/anthropiccheck.py` by
   Eduardo Florencio ([eduffd](https://github.com/eduffd)), and the Hermes Agent page by Steve Darlow
   ([@kerpopule](https://github.com/kerpopule)).
+- **hashd1ve** ([hashd1ve](https://github.com/hashd1ve)): the change to `model/chat_template.jinja` that writes each piece of the
+  prompt out as it is made instead of adding it to one growing string, which cut rank 0's memory growth with long
+  conversations ([issue #1](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/1)).
 - **Mia's AI Lab**: this recipe's own engine patches, `zig/patches/0001`-`0003` (changes to BertholomusAI's engine, written
   for this recipe, Apache-2.0): the prefill indexer split between the two ranks, a second AIO ring for Engram reads and
   prompt-cache placement for resumed prompts; also `tools/exact.py` (token-hash replay check) and `scripts/memguard.sh`.
