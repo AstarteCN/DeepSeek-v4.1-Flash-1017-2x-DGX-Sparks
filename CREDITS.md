@@ -90,8 +90,11 @@ License 2.0 ([`LICENSE`](LICENSE)); [`NOTICE`](NOTICE) carries the notices that 
   prompt-cache placement (0003), a second AIO ring for Engram reads (0002) and a row split of the prefill indexer between the
   two ranks (0001). The idea of splitting the indexer is credited to drowzeys, from the GLM-5.3-Flash recipe's design; no code of
   that recipe was used. They modify code by TensorFold's contributors and BertholomusAI, which keeps their licences.
-- **`zig/patches/0004-call-gate.patch`** (`tool_choice` enforcement) is a Zig port, written for this recipe's spark1/spark2 deployment, of the
-  call gate in TensorFold's Python engine (`call_gate.py`, by the TensorFold contributors, Apache-2.0).
+- **`zig/patches/0004-call-gate.patch`** (`tool_choice` enforcement) was written by Mia's AI Lab (Apache-2.0). Its new file,
+  `zig/src/core/lanes/call_gate.zig`, is Mia's AI Lab's Zig call gate for the Flash Next CUDA engine (commits `49350ed6` and
+  `c948979c` of 2026-10-07, with fixes `06cbbf72` and `1b082936`), which is itself a port of the call gate in TensorFold's
+  Python engine (`call_gate.py`, by the TensorFold contributors, Apache-2.0). The rest of the patch wires it into the
+  DeepSeek-V4.1 lanes.
 - **Written for this recipe** (Apache-2.0, see [`NOTICE`](NOTICE)): `tools/exact.py`, `scripts/memguard.sh` (the memory watchdog), the memory
   preflight (`MIN_AVAIL_GIB`), `HEAD_ENGRAM_DIR` and `HEAD_NFS_SERVER` / `HEAD_NFS_VOLUME` (rank 0's local Engram folder
   and docker NFS volume), and `tools/bench.py` and `tools/smoke.py`. They use the engine's flags, `/health` and

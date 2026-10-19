@@ -304,7 +304,8 @@ third-party parts keep theirs ([`NOTICE`](NOTICE)).
   for this recipe, Apache-2.0): the prefill indexer split between the two ranks, a second AIO ring for Engram reads and
   prompt-cache placement for resumed prompts; also `tools/exact.py` (token-hash replay check) and `scripts/memguard.sh`.
   The idea of splitting the indexer is drowzeys's, from the GLM-5.3-Flash recipe's design (no code of it was used).
-  `0004` (`tool_choice` enforcement) is a Zig port of the call gate in TensorFold's Python engine (`call_gate.py`), by the
+  `0004` (`tool_choice` enforcement) is Mia's AI Lab's Zig call gate from its Flash Next CUDA engine, carried into the
+  DeepSeek-V4.1 lanes; that gate is a port of the call gate in TensorFold's Python engine (`call_gate.py`), by the
   TensorFold contributors (Apache-2.0).
 - **NVIDIA**: the DGX Spark and GB10 hardware, and the PyTorch container (`nvcr.io/nvidia/pytorch:26.07-py3`) the image is
   built on (CUDA, NCCL, cuBLAS; under NVIDIA's container license).
