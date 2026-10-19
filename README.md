@@ -143,8 +143,8 @@ watchdog exists because that can freeze a Spark; see [Memory and safety](#memory
 On the head:
 
 ```bash
-git clone https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks-TensorFold.git
-cd DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks-TensorFold
+git clone https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks.git
+cd DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks
 cp scripts/local.sh.example scripts/local.sh     # set WORKER=user@192.0.2.2 in it (and FABRIC_PEER, see below)
 DRY_RUN=1 ./start.sh                              # prints what it would do; changes and starts nothing
 ./start.sh
