@@ -57,7 +57,7 @@ def record(name, status, detail=""):
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--url", default=os.environ.get("API_URL", "http://127.0.0.1:" + os.environ.get("PORT", "8888")))
-    ap.add_argument("--model", default=os.environ.get("MODEL", "DeepSeek-V4.1-Flash-1017-EXL3"))
+    ap.add_argument("--model", default=os.environ.get("MODEL", "DeepSeek-V4.1-Flash-1017"))
     ap.add_argument("--json", help="write the results here")
     a = ap.parse_args()
     url = a.url.rstrip("/")

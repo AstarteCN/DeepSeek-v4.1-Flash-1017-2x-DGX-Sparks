@@ -39,7 +39,7 @@ import urllib.error
 import urllib.request
 
 SCHEMA = 1
-DEFAULT_MODEL = "DeepSeek-V4.1-Flash-1017-EXL3"
+DEFAULT_MODEL = "DeepSeek-V4.1-Flash-1017"
 SECRET = "violet-harbor-7291"
 # Same word list as tools/client.py, so prompt token counts match the other checks (~0.82 tokens per prose "size").
 WORDS = ("time year people way day man thing woman life child world school state family student group country "

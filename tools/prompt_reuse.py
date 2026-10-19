@@ -25,7 +25,7 @@ sys.dont_write_bytecode = True           # no tools/__pycache__ from importing c
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # python3 -I does not add the script's folder
 from client import URL, open_url, prose  # noqa: E402
 
-MODEL = os.environ.get("MODEL", "DeepSeek-V4.1-Flash-1017-EXL3")
+MODEL = os.environ.get("MODEL", "DeepSeek-V4.1-Flash-1017")
 SYSTEM = {"role": "system", "content": "You are a careful coding agent. Read the material, then answer briefly. "
           + prose(2000, 1)}
 

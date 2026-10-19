@@ -90,7 +90,7 @@ prebuilt_image() {
 CONTAINER_NAME="${CONTAINER_NAME:-dsv41-1017-exl3-tf}"   # the same name on both Sparks
 
 # ---------------------------------------------------------------- serving
-SERVED_NAME="${SERVED_NAME:-DeepSeek-V4.1-Flash-1017-EXL3}"
+SERVED_NAME="${SERVED_NAME:-DeepSeek-V4.1-Flash-1017}"
 HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-8888}"
 # A request's positions at most (prompt and reply). The model's window is 1,048,576 tokens. The streams share a pool of

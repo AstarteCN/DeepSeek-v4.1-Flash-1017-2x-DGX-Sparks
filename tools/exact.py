@@ -34,7 +34,7 @@ import urllib.request
 
 SCHEMA = 1
 PROMPT_SET = 2   # 2 adds len_30000/50000/64000/100000 and the conv_* scenario; records of set 1 cannot be used with --like
-DEFAULT_MODEL = "DeepSeek-V4.1-Flash-1017-EXL3"
+DEFAULT_MODEL = "DeepSeek-V4.1-Flash-1017"
 WORDS = ("time year people way day man thing woman life child world school state family student group country "
          "problem hand part place case week company system program question work government number night point "
          "home water room mother area money story fact month lot right study book eye job word business issue "

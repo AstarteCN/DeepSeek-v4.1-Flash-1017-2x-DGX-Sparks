@@ -66,7 +66,7 @@ Add any other context here: a minimal request that reproduces bad output, JSON r
 curl -s http://<head-address>:8888/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "DeepSeek-V4.1-Flash-1017-EXL3",
+    "model": "DeepSeek-V4.1-Flash-1017",
     "messages": [{"role": "user", "content": "..."}],
     "max_tokens": 2000
   }'

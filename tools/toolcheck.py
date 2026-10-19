@@ -19,7 +19,7 @@ TOOLS = [{"type": "function", "function": {
 
 
 def main() -> None:
-    body = {"model": os.environ.get("MODEL", "DeepSeek-V4.1-Flash-1017-EXL3"), "max_tokens": 1024, "temperature": 0, "tools": TOOLS,
+    body = {"model": os.environ.get("MODEL", "DeepSeek-V4.1-Flash-1017"), "max_tokens": 1024, "temperature": 0, "tools": TOOLS,
             "messages": [{"role": "user", "content": "Tag document 42 with 'urgent', 'finance' and 'q3' using the tool."}]}
     req = urllib.request.Request(URL, json.dumps(body).encode(), {"Content-Type": "application/json"})
     msg = json.load(open_url(req, 600))["choices"][0]["message"]

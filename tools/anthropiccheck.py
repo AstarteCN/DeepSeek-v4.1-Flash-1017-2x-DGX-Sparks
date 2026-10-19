@@ -17,7 +17,7 @@ from client import API_URL, open_url  # noqa: E402
 
 MESSAGES = API_URL + "/v1/messages"
 COUNT = MESSAGES + "/count_tokens"
-MODEL = os.environ.get("MODEL", "DeepSeek-V4.1-Flash-1017-EXL3")
+MODEL = os.environ.get("MODEL", "DeepSeek-V4.1-Flash-1017")
 HEADERS = {"Content-Type": "application/json", "anthropic-version": "2023-06-01"}
 TOOLS = [{"name": "add_tags", "description": "Attach tags to a document.",
           "input_schema": {"type": "object", "required": ["doc_id", "tags"],

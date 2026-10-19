@@ -24,7 +24,7 @@ def main() -> None:
     at = int(len(hay) * 0.6)
     hay.insert(at, f"Remember this: the secret passphrase is {SECRET}")
     prompt = ". ".join(hay) + "\n\nWhat is the secret passphrase mentioned in the text above? Reply with the passphrase only."
-    body = {"model": os.environ.get("MODEL", "DeepSeek-V4.1-Flash-1017-EXL3"), "max_tokens": 2048, "temperature": 0, "seed": 1234,
+    body = {"model": os.environ.get("MODEL", "DeepSeek-V4.1-Flash-1017"), "max_tokens": 2048, "temperature": 0, "seed": 1234,
             "messages": [{"role": "user", "content": prompt}]}
     t0 = time.time()
     req = urllib.request.Request(URL, json.dumps(body).encode(), {"Content-Type": "application/json"})

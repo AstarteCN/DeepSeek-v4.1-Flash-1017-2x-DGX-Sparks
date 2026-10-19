@@ -31,7 +31,7 @@ OFF = {"chat_template_kwargs": {"enable_thinking": False}}
 
 
 def post(path: str, body: dict) -> dict:
-    req = urllib.request.Request(API_URL + path, json.dumps({"model": "DeepSeek-V4.1-Flash-1017-EXL3", **body}).encode(),
+    req = urllib.request.Request(API_URL + path, json.dumps({"model": "DeepSeek-V4.1-Flash-1017", **body}).encode(),
                                  {"Content-Type": "application/json"})
     with open_url(req, timeout=900) as r:
         return json.load(r)

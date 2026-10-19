@@ -14,11 +14,11 @@ selected profile's `config.yaml`:
 model:
   provider: custom
   base_url: http://127.0.0.1:8888/v1
-  default: DeepSeek-V4.1-Flash-1017-EXL3
+  default: DeepSeek-V4.1-Flash-1017
   context_length: 1048576
 ```
 
-`default` is `SERVED_NAME` (`DeepSeek-V4.1-Flash-1017-EXL3` unless changed). Verify `/v1/models` and the model field of actual
+`default` is `SERVED_NAME` (`DeepSeek-V4.1-Flash-1017` unless changed). Verify `/v1/models` and the model field of actual
 replies rather than trusting a requested alias. Keep the endpoint loopback or private (`HOST=127.0.0.1`); an
 unauthenticated OpenAI-compatible API must not be exposed publicly. The context value is configured capacity, not a
 full-window stress qualification. Current Hermes guidance:
