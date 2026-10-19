@@ -5,6 +5,7 @@ WORKER=user@192.0.2.2          # ssh target of the second Spark (key-based: ssh-
 # HF_CACHE=/models/hf          # this Spark's Hugging Face cache, if it is not ~/.cache/huggingface (it needs ~505 GB free)
 # WORKER_ENGRAM_DIR='$HOME/.cache/dsv41-tensorfold/engram-1bae0e10'     # on the worker: Engram's tables (~203 GB)
 # WORKER_CACHE_DIR='$HOME/.cache/dsv41-tensorfold/rank-cache-c178a012'  # on the worker: rank 1's weight file (~106 GB)
+# MEMGUARD_GIB=4              # memguard's floor (GiB of MemAvailable). A head that also runs a desktop can sit within 3 GiB of it: README, Memory and safety
 # ABLIT=0                     # 1: matching Keys overlay on Mia EAQ 2.9 bpw; needs your HF token AND access below
 # HF_TOKEN=hf_...              # HF read token (or use hf auth login on the head); never commit your token
 # ABLIT=1 requires access: https://huggingface.co/drowzeys/keys-DeepSeek-V4.1-Flash-1017-Abliterated

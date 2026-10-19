@@ -268,6 +268,19 @@ if smoke=$(curl -s --max-time 300 "${AUTH[@]}" "$URL/v1/chat/completions" -H 'Co
 else
   fail "the smoke test request failed (no reply text, or one character repeated); the ranks are still running"
 fi
+# Headroom: how far MemAvailable sits above memguard's floor once the weights, graphs and caches are loaded (issue #4). Nothing in
+# the engine holds MemAvailable above that floor while it runs: a long prompt's workspace comes out of this headroom, and memguard
+# kills the rank if it reaches the floor. A head that also runs a desktop and other containers has the least.
+if awk -v g="$MEMGUARD_GIB" 'BEGIN {exit !(g > 0)}'; then
+  mem_here=$(mem_available_gib)
+  mem_there=$(worker 1 "awk '/^MemAvailable:/ {printf \"%.1f\", \$2 / 1048576}' /proc/meminfo" 2>/dev/null || echo "?")
+  log "Memory after the load: ${mem_here} GiB available on this Spark, ${mem_there} GiB on $(worker_host 1); memguard's floor is $MEMGUARD_GIB GiB"
+  for pair in "this Spark:$mem_here" "$(worker_host 1):$mem_there"; do
+    v=${pair##*:}; [[ "$v" =~ ^[0-9.]+$ ]] || continue
+    awk -v a="$v" -v g="$MEMGUARD_GIB" 'BEGIN {exit !(a < g + 3)}' &&
+      warn "only $v GiB available on ${pair%:*}, within 3 GiB of memguard's floor ($MEMGUARD_GIB GiB): a long prompt can take that and memguard then kills the rank. Free memory there (desktop, other containers: README, Memory and safety) before relying on this server"
+  done
+fi
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 [[ "$HOST" == 0.0.0.0 || "$HOST" == "::" ]] || IP="$HOST"
 printf '\n%s  ✔ %s is now LIVE! on port %s%s\n\n' "$G" "$SERVED_NAME" "$PORT" "$R"

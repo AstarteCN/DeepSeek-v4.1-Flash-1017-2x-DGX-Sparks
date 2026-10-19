@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Issues [#2](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/2),
+  [#3](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/3),
+  [#4](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/4) (reported by lukemdanastasi): `TF_REF` moves from
+  `3ff3b2ac` to `629c524` (the branch tip of 2026-10-19). It brings `9f82099` (a long prompt pass lets streams near their
+  `max_tokens` finish before the next pass; kept prompts hold their extent), `629c524` (a shared prefix no longer stales the first
+  conversation's kept states) and the template and JSON-writer fixes. `zig/patches/0003` (cache placement) is removed: the engine does this
+  itself now and the patch no longer applies. **Not run on a pair**: the image builds (`tensorfold-dsv41:exl3-tp2-bd95cdfc712d`) and the engine's host tests pass with
+  patches 0001, 0002 and 0004 applied (`zig build test`: 21/21 steps, 221/221 tests), but nothing was served from it. Not fixed, because they are engine behaviour: prompts with images run whole and keep nothing (#2); a prompt pass runs
+  to completion before other streams decode and a cancel waits for it (#3, only the tip's narrow mitigation applies).
+  For #4 `start.sh` now reports `MemAvailable` on both Sparks after the load and warns when it is within 3 GiB of `MEMGUARD_GIB`, and the
+  README says what holds the memory above the floor (nothing at run time) and what to do on a shared head.
 - First version: DeepSeek-V4.1-Flash-1017 EXL3 2.9 bpw on two DGX
   Sparks, TensorFold's native Zig engine with BertholomusAI's `dsv41` family (`deepseek-v41-zig` @ `3ff3b2ac`), their kit
   (`abe07c7`) and their weight-file tool (`deepseek-v41-zig-tp4` @ `5940208`). Scripts adapted from the GLM-5.3-Flash

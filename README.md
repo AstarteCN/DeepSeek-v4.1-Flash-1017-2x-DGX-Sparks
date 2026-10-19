@@ -91,9 +91,19 @@ resumes, four at once, a three-conversation scenario; `tools/exact.py`). Each is
 
 | Switch | Result |
 | --- | --- |
-| `TF_DS_CACHE_PLACEMENT=1` (**on**) | In the three-conversation scenario, conversation B's second turn used to miss the prompt cache and re-read its whole 6K-token prompt (0 tokens reused); it now reuses 4,096, with an identical reply. Every other turn is unchanged. |
+| `TF_DS_CACHE_PLACEMENT=1` (gone) | Measured on the earlier pin: in the three-conversation scenario conversation B's second turn used to miss the prompt cache and re-read its whole 6K-token prompt; with the patch it reused 4,096, with an identical reply. The pin is now `629c524`, whose engine places kept states itself (a conversation sharing a prefix copies the shared rows to a free extent); the patch was removed and the scenario was not re-measured on it. |
 | `TF_DS_ENGRAM_LANES=2` (off) | A second I/O ring for the prompt's Engram reads. Bit-identical, but prefill 1.5-2.6% *slower* from 8K to 131K: the drive is the limit. |
 | `TF_DS_IDX_SPLIT=1` (off) | Splits the prefill indexer's rows between the two ranks. Bit-identical, with no measurable gain on this pair (modeled at +1% at 64K and +2% at 128K; the undisturbed 32K repetitions tie the baseline). If the two ranks ever disagree on the setting the pair hangs, so it stays off. |
+
+Known limits of the engine, from user reports (issues [#2](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/2) and
+[#3](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/3), read in `lanes.zig` and `lane_host.zig` of the pinned engine): a prompt that
+carries images runs whole and keeps nothing ("a kept state knows no images"), so every turn of a conversation with images in its
+history is cold (~90 s at 160K tokens in the report); and a prompt pass runs to completion inside its admission, so other streams
+get no decode round meanwhile and a cancel waits for it (the pin `629c524` only lets streams within 256 tokens of `max_tokens`
+finish, for up to 5 s, after a pass of a second or more). Both are in BertholomusAI's engine, not in the recipe's scripts. Until
+they change upstream: keep screenshots out of long agent histories, and do not start a cold long prompt while another chat is
+decoding. `ENGINE=jl` interleaves prompt pieces with other slots' decode (`TF_DSV41_PREFILL_PIECES`); its image prompt reuse
+was not tested here.
 
 What is **not** checked: image input and `tools/validate.py` on this pair; other cabling, hardware or a head with less
 memory to spare; days of uptime; and the engine's behaviour at the memory floor under heavy concurrent long prompts (the
@@ -272,7 +282,7 @@ Settings come from the environment, `scripts/local.sh` or `.env`; the defaults a
 | `MEMGUARD_GIB` | 4 | `scripts/memguard.sh` kills a rank's container when the memory available stays under this floor (decimals fine; `0` turns it off) |
 | `HEAD_ENGRAM_DIR` | empty | a local folder with Engram's two shards for rank 0 (as `WORKER_ENGRAM_DIR` is on the worker); empty reads them from `HF_CACHE` |
 | `HEAD_NFS_SERVER`, `HEAD_NFS_VOLUME` | empty | rank 0 reads the checkpoint over NFS through a docker volume the docker daemon mounts (no root, survives a reboot); empty uses `HF_CACHE` as a host path. sshfs does not work: it lists files as type "unknown", which the engine skips |
-| `TF_DS_CACHE_PLACEMENT`, `TF_DS_ENGRAM_LANES`, `TF_DS_IDX_SPLIT` | unset | the engine patches' switches (`zig/patches/`, see Status); a `TF_DS_*` variable you export goes to both ranks |
+| `TF_DS_ENGRAM_LANES`, `TF_DS_IDX_SPLIT` | unset | the engine patches' switches (`zig/patches/`, see Status); a `TF_DS_*` variable you export goes to both ranks |
 | `RANK1_PROFILE` | empty | `1` or `2` starts rank 1 with `--profile`, which prints its prefill phase timings when rank 0 stops first (adds a sync per chunk: for attribution, not for timing) |
 | `API_KEY` | 0 | `1` makes rank 0 require a key (`Authorization: Bearer`; generated in `$STATE_DIR/api-key`, mode 600). The API is open on the network by default |
 | `HOST`, `PORT`, `SERVED_NAME` | 0.0.0.0, 8888, `DeepSeek-V4.1-Flash-1017` | |
@@ -294,6 +304,19 @@ answering and has to be power-cycled (this happened once, with the engine's rese
 - `scripts/memguard.sh` runs on both Sparks while the server is up and kills the rank's container (kill first, log after)
   when `MemAvailable` stays under `MEMGUARD_GIB` for two samples 0.5 s apart. It is a brake, not a guarantee: a very fast
   allocation can outrun it. Its log is `~/.cache/dsv41-tensorfold/logs/memguard.log`;
+- **what holds `MemAvailable` above the floor while a rank runs: nothing**, with `ENGINE=zig`. The 12.2 GiB reserve only
+  shapes what the engine allocates when it loads (its boot line reads `4 streams at once, 0.00 GiB each ... of 0.0 GiB left after a
+  12.2 GiB reserve` on a head with a 524,288-token window: nothing is left over for the streams); a prompt's prefill workspace, the
+  prompt cache (512 MiB), the graphs and everything else on the Spark then draw from what `MemAvailable` still shows, and
+  `memguard` kills the rank when that reaches `MEMGUARD_GIB` ([issue #4](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/4):
+  a head with a desktop, sparkDash and hermes read 7 GiB right after the load and was killed at 4.085 GiB during a cache-hit turn at 265K tokens).
+  `start.sh` now prints `MemAvailable` on both Sparks after the load and warns when either is within 3 GiB of the floor. On a head
+  that is that close: stop what does not need to run there (the desktop session: `sudo systemctl set-default multi-user.target`
+  and reboot; other containers; sparkDash and similar on the worker or another machine), keep `MIN_AVAIL_GIB` as it is, and do not
+  raise `MEMGUARD_GIB` (a higher floor kills sooner). A lower floor (the README's own long-prompt runs used 2.5) trades the
+  kill for the risk of freezing the Spark. `ENGINE=jl` does check at run time: it refuses admissions under a 4 GiB hard floor, falls
+  back to 2K prompt segments and runs a missing graph eagerly instead of capturing it ([docs/jl-engine.md](docs/jl-engine.md)); its boot check also sizes the pool to what the
+  head can spare.
 - the KV cache is small (compressed FP4 with block scales; about 0.5 GiB at 262,144 tokens and ~1.8 GiB at the full window,
   by two memory readings); it is sized from `CONTEXT` when the model loads and shared by the streams. Most of the
   memory is the weights (~99 GiB, of which ~3.5 GiB are the drafter's), so the head's other software decides what is left.
@@ -308,7 +331,7 @@ scripts/prepare.sh           image, downloads, kit, token map, weight files, the
 scripts/memguard.sh          the memory watchdog start.sh runs on both Sparks (kills a rank's container below MEMGUARD_GIB)
 scripts/zig_flags.py         start.sh's check of rank 0's serve flags against the image's `capabilities --json`
 scripts/publish-image.sh     pushes the built image to ghcr.io (only on purpose)
-zig/Dockerfile, zig/patches  the engine image; patches to the pinned engine (four)
+zig/Dockerfile, zig/patches  the engine image; patches to the pinned engine (three)
 model/chat_template.jinja    the chat template rank 0 serves
 tools/validate.py            an end-to-end check of a running server
 tools/bench.py               prefill, decode, multi-stream and needle measurements as JSON, with `--compare A.json B.json`
@@ -365,9 +388,9 @@ third-party parts keep theirs ([`NOTICE`](NOTICE)).
 - **hashd1ve** ([hashd1ve](https://github.com/hashd1ve)): the change to `model/chat_template.jinja` that writes each piece of the
   prompt out as it is made instead of adding it to one growing string, which cut rank 0's memory growth with long
   conversations ([issue #1](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/1)).
-- **Mia's AI Lab**: this recipe's own engine patches, `zig/patches/0001`-`0003` (changes to BertholomusAI's engine, written
-  for this recipe, Apache-2.0): the prefill indexer split between the two ranks, a second AIO ring for Engram reads and
-  prompt-cache placement for resumed prompts; also `tools/exact.py` (token-hash replay check) and `scripts/memguard.sh`.
+- **Mia's AI Lab**: this recipe's own engine patches, `zig/patches/0001` and `0002` (changes to BertholomusAI's engine, written
+  for this recipe, Apache-2.0): the prefill indexer split between the two ranks and a second AIO ring for Engram reads (a third, prompt-cache placement,
+  was dropped when the pin moved); also `tools/exact.py` (token-hash replay check) and `scripts/memguard.sh`.
   The idea of splitting the indexer is drowzeys's, from the GLM-5.3-Flash recipe's design (no code of it was used).
   `0004` (`tool_choice` enforcement) is Mia's AI Lab's Zig call gate from its Flash Next CUDA engine, carried into the
   DeepSeek-V4.1 lanes; that gate is a port of the call gate in TensorFold's Python engine (`call_gate.py`), by the
