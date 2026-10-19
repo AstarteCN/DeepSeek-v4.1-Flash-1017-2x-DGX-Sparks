@@ -280,7 +280,7 @@ Settings come from the environment, `scripts/local.sh` or `.env`; the defaults a
 | `RDMA`, `GRAPHS`, `SIDE`, `PREFETCH`, `ENGRAM_AIO` | 1 | the engine's served settings |
 | `MAX_TOKENS` | 32768 | a reply's budget when a request sets none |
 | `MIN_AVAIL_GIB` | 109 | `start.sh` refuses to start with less memory available than this on either Spark (`0` skips the check) |
-| `MEMGUARD_GIB` | 4 | `scripts/memguard.sh` kills a rank's container when the memory available stays under this floor (decimals fine; `0` turns it off) |
+| `MEMGUARD_GIB`, `MEMGUARD_HOLD_S`, `MEMGUARD_HARD_GIB` | 2.5, 4, 1 | `scripts/memguard.sh` kills a rank's container when the memory available stays under the floor for `MEMGUARD_HOLD_S` seconds without coming back over it, or at once when it falls under the hard floor. A dip that recovers is logged and not killed (decimals fine; `MEMGUARD_GIB=0` turns the guard off) |
 | `HEAD_ENGRAM_DIR` | empty | a local folder with Engram's two shards for rank 0 (as `WORKER_ENGRAM_DIR` is on the worker); empty reads them from `HF_CACHE` |
 | `HEAD_NFS_SERVER`, `HEAD_NFS_VOLUME` | empty | rank 0 reads the checkpoint over NFS through a docker volume the docker daemon mounts (no root, survives a reboot); empty uses `HF_CACHE` as a host path. sshfs does not work: it lists files as type "unknown", which the engine skips |
 | `TF_DS_ENGRAM_LANES`, `TF_DS_IDX_SPLIT` | unset | the engine patches' switches (`zig/patches/`, see Status); a `TF_DS_*` variable you export goes to both ranks |
@@ -303,8 +303,11 @@ answering and has to be power-cycled (this happened once, with the engine's rese
 - `start.sh` checks `MIN_AVAIL_GIB` on both Sparks before it stops or starts anything, and stops a running server before
   it builds or downloads;
 - `scripts/memguard.sh` runs on both Sparks while the server is up and kills the rank's container (kill first, log after)
-  when `MemAvailable` stays under `MEMGUARD_GIB` for two samples 0.5 s apart. It is a brake, not a guarantee: a very fast
-  allocation can outrun it. Its log is `~/.cache/dsv41-tensorfold/logs/memguard.log`;
+  on either of two levels, sampling every 0.25 s: `MemAvailable` under `MEMGUARD_HARD_GIB` (1 GiB) in two samples in a row, or under
+  `MEMGUARD_GIB` (2.5 GiB) for `MEMGUARD_HOLD_S` (4) seconds without once coming back over it. A long prompt's workspace takes a few GiB
+  for a moment and gives them back; such a dip is logged with its length and lowest value (`... and recovered: no kill`) and the rank
+  lives. It is a brake, not a guarantee: a very fast allocation can outrun it. Its log is
+  `~/.cache/dsv41-tensorfold/logs/memguard.log`;
 - **what holds `MemAvailable` above the floor while a rank runs: nothing**, with `ENGINE=zig`. The 12.2 GiB reserve only
   shapes what the engine allocates when it loads (its boot line reads `4 streams at once, 0.00 GiB each ... of 0.0 GiB left after a
   12.2 GiB reserve` on a head with a 524,288-token window: nothing is left over for the streams); a prompt's prefill workspace, the
@@ -314,8 +317,8 @@ answering and has to be power-cycled (this happened once, with the engine's rese
   `start.sh` now prints `MemAvailable` on both Sparks after the load and warns when either is within 3 GiB of the floor. On a head
   that is that close: stop what does not need to run there (the desktop session: `sudo systemctl set-default multi-user.target`
   and reboot; other containers; sparkDash and similar on the worker or another machine), keep `MIN_AVAIL_GIB` as it is, and do not
-  raise `MEMGUARD_GIB` (a higher floor kills sooner). A lower floor (the README's own long-prompt runs used 2.5) trades the
-  kill for the risk of freezing the Spark. `ENGINE=jl` does check at run time: it refuses admissions under a 4 GiB hard floor, falls
+  raise `MEMGUARD_GIB` (a higher floor kills sooner). The defaults are the loose end of what has been run here (2.5 GiB floor, 4 s hold, 1 GiB
+  hard floor; the long-prompt runs in Status used 2.5): a lower floor or a longer hold trades the kill for the risk of freezing the Spark. `ENGINE=jl` does check at run time: it refuses admissions under a 4 GiB hard floor, falls
   back to 2K prompt segments and runs a missing graph eagerly instead of capturing it ([docs/jl-engine.md](docs/jl-engine.md)); its boot check also sizes the pool to what the
   head can spare.
 - the KV cache is small (compressed FP4 with block scales; about 0.5 GiB at 262,144 tokens and ~1.8 GiB at the full window,

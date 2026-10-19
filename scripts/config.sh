@@ -170,11 +170,15 @@ HEAD_NFS_VOLUME="${HEAD_NFS_VOLUME:-dsv41-hf-head}"
 #  - MIN_AVAIL_GIB: start.sh refuses to start unless each Spark has this much memory available (the weights, 98.9 GiB, plus
 #    the engine's own 12.2 GiB reserve). 0 turns the check off.
 #  - MEMGUARD_GIB: scripts/memguard.sh runs on both Sparks while the server is up and kills the rank's container when the
-#    memory available stays under this floor (GiB, decimals allowed: 2.5). 0 turns it off.
+#    memory available stays under this floor for MEMGUARD_HOLD_S seconds without coming back over it (GiB, decimals allowed:
+#    2.5; 0 turns the guard off), or at once when it falls under MEMGUARD_HARD_GIB. A long prompt's workspace takes a few GiB
+#    for a moment and gives them back: that dip is logged, not killed.
 # Do not lower TENSORFOLD_MEMORY_RESERVE_GIB to make the weights fit: the engine then takes the reserve too (a rank 0 with a
 # 10 GiB reserve froze its Spark).
 MIN_AVAIL_GIB="${MIN_AVAIL_GIB:-112}"
-MEMGUARD_GIB="${MEMGUARD_GIB:-4}"
+MEMGUARD_GIB="${MEMGUARD_GIB:-2.5}"
+MEMGUARD_HOLD_S="${MEMGUARD_HOLD_S:-4}"
+MEMGUARD_HARD_GIB="${MEMGUARD_HARD_GIB:-1}"
 
 # Colours only on a terminal.
 _c() { [[ -t "$1" ]] && printf '\033[%sm' "$2" || true; }
