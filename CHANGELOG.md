@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Worker cache cleanup handles login shells that reject unmatched globs; regression tests cover an empty cache and stale-file cleanup. By **mvandergrift**, pull request [#19](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/pull/19).
+
 - `tools/bench.py` uses the port the server actually listens on when neither `--url` nor `API_URL` is given: `PORT` from the
   environment, then from `scripts/local.sh` (the file the README says to put settings in), then the recipe's 8888. A pair that
   moved `PORT` no longer gets a page of `Connection refused` from the recipe's own bench. `--url`, `API_URL` and `PORT` keep
