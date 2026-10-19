@@ -86,7 +86,7 @@ License 2.0 ([`LICENSE`](LICENSE)); [`NOTICE`](NOTICE) carries the notices that 
   ([@kerpopule](https://github.com/kerpopule)); `scripts/zig_flags.py` (the serve flags checked against
   `tensorfold-native capabilities --json`), `scripts/publish-image.sh` and the registry pull in `scripts/prepare.sh`, and the
   issue and pull request templates and `FUNDING.yml` in `.github`, by Mia's AI Lab.
-- **`zig/patches/0001-0003`** are changes to BertholomusAI's engine written for this recipe (Apache-2.0), each off by default: the
+- **`zig/patches/0001-0003`** are changes to BertholomusAI's engine written by Mia's AI Lab for this recipe (Apache-2.0), each off by default: the
   prompt-cache placement (0003), a second AIO ring for Engram reads (0002) and a row split of the prefill indexer between the
   two ranks (0001). The idea of splitting the indexer is credited to drowzeys, from the GLM-5.3-Flash recipe's design; no code of
   that recipe was used. They modify code by TensorFold's contributors and BertholomusAI, which keeps their licences.

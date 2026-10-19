@@ -255,7 +255,7 @@ scripts/prepare.sh           image, downloads, kit, token map, weight files, the
 scripts/memguard.sh          the memory watchdog start.sh runs on both Sparks (kills a rank's container below MEMGUARD_GIB)
 scripts/zig_flags.py         start.sh's check of rank 0's serve flags against the image's `capabilities --json`
 scripts/publish-image.sh     pushes the built image to ghcr.io (only on purpose; none is published yet)
-zig/Dockerfile, zig/patches  the engine image; patches to the pinned engine (none yet)
+zig/Dockerfile, zig/patches  the engine image; patches to the pinned engine (four)
 model/chat_template.jinja    the chat template rank 0 serves
 tools/validate.py            an end-to-end check of a running server
 tools/bench.py               prefill, decode, multi-stream and needle measurements as JSON, with `--compare A.json B.json`
@@ -306,9 +306,12 @@ third-party parts keep theirs ([`NOTICE`](NOTICE)).
   (workers by host name; `tools/end_of_turn.py`) and john (each rank's rendezvous address); `tools/anthropiccheck.py` by
   Eduardo Florencio ([eduffd](https://github.com/eduffd)), and the Hermes Agent page by Steve Darlow
   ([@kerpopule](https://github.com/kerpopule)).
-- `zig/patches/`: changes to BertholomusAI's engine written for this recipe (Apache-2.0); the idea of splitting the prefill
-  indexer between the ranks is drowzeys's, from the GLM-5.3-Flash recipe's design (no code of it was used); `0004` is a Zig
-  port of the call gate in TensorFold's Python engine, by the TensorFold contributors (Apache-2.0).
+- **Mia's AI Lab**: this recipe's own engine patches, `zig/patches/0001`-`0003` (changes to BertholomusAI's engine, written
+  for this recipe, Apache-2.0): the prefill indexer split between the two ranks, a second AIO ring for Engram reads and
+  prompt-cache placement for resumed prompts; also `tools/exact.py` (token-hash replay check) and `scripts/memguard.sh`.
+  The idea of splitting the indexer is drowzeys's, from the GLM-5.3-Flash recipe's design (no code of it was used).
+  `0004` (`tool_choice` enforcement) is a Zig port of the call gate in TensorFold's Python engine (`call_gate.py`), by the
+  TensorFold contributors (Apache-2.0).
 - **NVIDIA**: the DGX Spark and GB10 hardware, and the PyTorch container (`nvcr.io/nvidia/pytorch:26.07-py3`) the image is
   built on (CUDA, NCCL, cuBLAS; under NVIDIA's container license).
 
