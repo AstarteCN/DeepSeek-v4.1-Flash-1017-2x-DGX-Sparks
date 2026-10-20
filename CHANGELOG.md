@@ -14,6 +14,11 @@
   environment, then from `scripts/local.sh` (the file the README says to put settings in), then the recipe's 8888. A pair that
   moved `PORT` no longer gets a page of `Connection refused` from the recipe's own bench. `--url`, `API_URL` and `PORT` keep
   their precedence. By **yume-arasaki**, pull request [#39](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/pull/39); regression coverage also checks repeated assignments and avoids evaluating shell text.
+- `zig/patches/0008-pool-window.patch` and `POOL` (empty: `CONTEXT`, as before): the shared pool may be larger than the window. A kept prompt holds its extent, so at the default 1,048,576
+  positions three 386K-token conversations cannot all stay resident (issue [#16](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/16) is the picture case of the same
+  placement). The RoPE tables are sized by the window now, not the pool (the kit's tables already hold 1,114,112 rows). The extra KV is host memory: about 0.9 GiB a rank per 1,048,576 positions
+  (`POOL=2097152`: head idle `MemAvailable` 6.76 to 5.71 GiB, lowest during a cold 96K-token prompt 5.89 to 4.49 GiB; worker 8.63 to 7.43 and 8.60 to 7.33). The patch applies on its own. By **ezoushen**, pull request [#10](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/pull/10).
+
 - `prepare.sh`'s "cannot mount ... over NFS" error shows the last four lines of docker's output, not only the last (which was always
   docker's "Run 'docker run --help'" line, never the reason); the README's NFS section says what to check (issue
   [#15](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/15), reported by **aoeu10**). The README's memory note now
