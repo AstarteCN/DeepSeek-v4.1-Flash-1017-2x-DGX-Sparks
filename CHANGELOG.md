@@ -24,7 +24,7 @@
   head): +4.25% at 256K and +7.46% at 400K; 8K/32K prefill, decode and four streams within 0.9%. Replies keep their bits.
   `TF_DS_IDX_SPLIT=1` splits every eligible chunk as before, any other value turns it off.
 
-- `zig/patches/0007-rdma-idle-nap.patch` and `RDMA_IDLE_S` / `RDMA_NAP_US` (on by default; recipe 2 s quiet, 500 µs
+- `zig/patches/0010-rdma-idle-nap.patch` and `RDMA_IDLE_S` / `RDMA_NAP_US` (on by default; recipe 2 s quiet, 500 µs
   nap; the patch's engine fallback is 100 µs): the RDMA gather's proxy naps once the engine is idle instead of spinning a
   core on each rank (the logic of [TensorFold PR #27](https://github.com/bertholomus/TensorFold/pull/27), ported to the
   Zig ring). A decode round's gathers come microseconds apart, so they never see a nap; the first gather after a quiet
