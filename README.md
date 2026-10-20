@@ -81,7 +81,11 @@ with real prompts decode is above them (one stream: prose 74.9 against 59.0, cod
 A needle-in-a-haystack test at `CONTEXT=524288` (`tools/bench.py --suite needle`, a passphrase hidden at 10%, 50% and 90%
 depth of a 479,012-token prompt) found it 3 of 3 times; each prefill took ~280 s (~1,710 tok/s). The head's lowest free
 memory during it was 2.67 GiB, 0.17 GiB above the 2.5 GiB floor `memguard` was set to, so a 512K window is the practical
-limit for a head that carries ~6 GiB of other software. A 100K-token prompt also ran without errors at the full
+limit for a head that carries ~6 GiB of other software. A reported run at `CONTEXT=655360` (issue #17; 4.9 GiB free after the load on
+a head with its other services stopped) fell under the 2 GiB floor for the 4 s `MEMGUARD_HOLD_S` and had rank 0 killed on a turn
+that took a cache-hit history from 408K to 464K tokens: the head's free memory falls as a history grows (see the CHANGELOG: 6.5 GiB after
+the load, 4.9 at 159K tokens, 4.2 at 261K), and a larger `CONTEXT` only allows longer histories than the head can carry. Keep `CONTEXT` at 524288 or less on
+such a head, or free more of its memory first. A 100K-token prompt also ran without errors at the full
 1,048,576-token window (3.14 GiB free at the lowest) and at 524,288 tokens.
 
 **Engine patches** (`zig/patches/`, three, written for this recipe). Each is **off by default**, so the image behaves like
@@ -142,6 +146,11 @@ watchdog exists because that can freeze a Spark; see [Memory and safety](#memory
   sudo exportfs -ra
   ```
 
+  If `prepare.sh` then stops with "cannot mount this Spark's ... over NFS", read the lines under it: they are the end of docker's own
+  error (the reason is above docker's closing "Run 'docker run --help'" line). Check `sudo exportfs -v` on the head: the export must
+  list the *worker's* address on the link (the user@address in the message), the exported path must be `NFS_PATH`, and the worker must
+  reach the head's port 2049; the worker's docker mounts the volume itself, so it needs the host's NFS mount helper (`nfs-common` on
+  Ubuntu) if it reports a missing `mount.nfs` helper.
   `prepare.sh` then creates a read-only docker NFS volume on the worker (`NFS_VOLUME`, no sudo) and checks that the worker
   sees every file the ranks read. `NFS_PATH` is the exported path as the worker mounts it (default: the head's `HF_CACHE`;
   `/` for an NFSv4 export with `fsid=0`), `NFS_SERVER` the head's address (default: its address on the link).
