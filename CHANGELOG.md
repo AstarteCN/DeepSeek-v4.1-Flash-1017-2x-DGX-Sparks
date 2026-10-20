@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Check the worker's model/kit/token-map file view before stopping or launching ranks, including cached preparation; reject directories as required files. By **aoeu10**, pull request [#25](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/pull/25), with CPU regression coverage.
+
 - Worker cache cleanup handles login shells that reject unmatched globs; regression tests cover an empty cache and stale-file cleanup. By **mvandergrift**, pull request [#19](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/pull/19).
 
 - `tools/bench.py` uses the port the server actually listens on when neither `--url` nor `API_URL` is given: `PORT` from the
