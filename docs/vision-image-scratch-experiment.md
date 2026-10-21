@@ -37,8 +37,9 @@ not exit within 30s. That case is not accepted as a pass; PNG OOM testing was th
 isolated with Pillow disabled. Pillow protocol recovery under OOM is unverified.
 This branch does not repair that separate path.
 
-The full native service executable compiled on ARM64. Real HTTP/GPU candidate
-comparison is pending; neither default configuration nor model service was switched.
+The full native service executable compiled on ARM64. A later bounded real HTTP comparison is documented in
+[HTTP results](vision-image-scratch-http-results.md). Temporary instances were restored
+and stopped; the production default remains unchanged.
 These results do not establish 1M/2-lane stability or account for all observed host
 memory growth. Original user images, requests, logs and machine details are excluded.
 
