@@ -1,0 +1,28 @@
+--- a/model/chat_template.jinja
++++ b/model/chat_template.jinja
+@@ -79,7 +79,8 @@
+ 
+ {#- ---- 1. Merge tool results into user turns (reference merge_tool_messages) and rank each
+      result by its position in the preceding assistant's tool_calls (sort_tool_results_by_call_order).
+-     The template environment is sandboxed, so lists are rebuilt rather than mutated. ---- -#}
++     Only private user-turn namespaces are updated during this pass; lists stay immutable.
++     No user-turn object escapes or is observed until the read-only passes below. ---- -#}
+ {%- set ns = namespace(msgs = [], last_calls = []) -%}
+ {%- for message in messages -%}
+     {%- set role = message.role -%}
+@@ -98,11 +99,11 @@
+                             "tool": false, "rank": 0} -%}
+         {%- endif -%}
+         {%- if ns.msgs and ns.msgs[-1].role == "user" -%}
+-            {%- set ns.msgs = ns.msgs[:-1] + [{"role": "user", "parts": ns.msgs[-1].parts + [part],
+-                                               "reasoning_content": none, "tool_calls": none}] -%}
++            {%- set merge_turn = ns.msgs[-1] -%}
++            {%- set merge_turn.parts = merge_turn.parts + [part] -%}
+         {%- else -%}
+-            {%- set ns.msgs = ns.msgs + [{"role": "user", "parts": [part],
+-                                          "reasoning_content": none, "tool_calls": none}] -%}
++            {%- set ns.msgs = ns.msgs + [namespace(role="user", parts=[part],
++                                                reasoning_content=none, tool_calls=none)] -%}
+         {%- endif -%}
+     {%- else -%}
+         {%- set calls = message.tool_calls if message.tool_calls is defined else none -%}

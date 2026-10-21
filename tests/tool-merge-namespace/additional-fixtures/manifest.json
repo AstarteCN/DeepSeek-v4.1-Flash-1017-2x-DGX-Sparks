@@ -1,0 +1,162 @@
+[
+  {
+    "id": "merge_mixed_0",
+    "file": "merge_mixed_0.json",
+    "bytes": 921,
+    "sha256": "725e3d70f4864c39750bf4763745d988faf32e3fa4fb9597f847bdaf9d9d9e52",
+    "default_run": true,
+    "memory_probe": false
+  },
+  {
+    "id": "merge_mixed_1",
+    "file": "merge_mixed_1.json",
+    "bytes": 920,
+    "sha256": "cad0a43cfc92a24f7a3ffdb692294ca847246906619fc4ff6ab525193b740b1d",
+    "default_run": true,
+    "memory_probe": false
+  },
+  {
+    "id": "empty",
+    "file": "empty.json",
+    "bytes": 45,
+    "sha256": "e708f48226ff3abf9482a36b8299a082adf7b0974e2c67dd486669a0db4ab2e5",
+    "default_run": true,
+    "memory_probe": false
+  },
+  {
+    "id": "single_user",
+    "file": "single_user.json",
+    "bytes": 79,
+    "sha256": "17194b774224ae4783ea0a2c2b7203863260d75aa8d05dded16d9cb73932fc89",
+    "default_run": true,
+    "memory_probe": false
+  },
+  {
+    "id": "only_tools",
+    "file": "only_tools.json",
+    "bytes": 113,
+    "sha256": "bcffa75d12f2c113983769b5a07d7bb00b934934a713badb31ae40732ad33bfb",
+    "default_run": true,
+    "memory_probe": false
+  },
+  {
+    "id": "only_users",
+    "file": "only_users.json",
+    "bytes": 150,
+    "sha256": "de900d93e111b11c06d0cb1f4c8da6f3517a66d956b9749f5fb7356fdb97d895",
+    "default_run": true,
+    "memory_probe": false
+  },
+  {
+    "id": "merge_cancel_after_render",
+    "file": "merge_cancel_after_render.json",
+    "bytes": 961,
+    "sha256": "1c15f7cd00c42ba60540344db1ad33f910167a012a081b89c8740287021502e8",
+    "default_run": true,
+    "memory_probe": false
+  },
+  {
+    "id": "merge_cancel_after_encode",
+    "file": "merge_cancel_after_encode.json",
+    "bytes": 961,
+    "sha256": "f802896264e5e0f409b4b176675cc5bb30af1609c8db836fa15ef75a14694e57",
+    "default_run": true,
+    "memory_probe": false
+  },
+  {
+    "id": "merge_oom_render",
+    "file": "merge_oom_render.json",
+    "bytes": 943,
+    "sha256": "2d2784c05ff05df3f686656b26611cea54a9d7b6bb38c84a18b6d61d874a3bd1",
+    "default_run": true,
+    "memory_probe": false
+  },
+  {
+    "id": "merge_oom_encode",
+    "file": "merge_oom_encode.json",
+    "bytes": 943,
+    "sha256": "6f0fba6fb36c324c149f0291a8049e5a4080b9707f51c3fe2494c1cc12ee818f",
+    "default_run": true,
+    "memory_probe": false
+  },
+  {
+    "id": "merge_invalid_role",
+    "file": "merge_invalid_role.json",
+    "bytes": 853,
+    "sha256": "f338923183dc0e3d7d22344ebdabeb985f18024ce8cf1ad8bcc21cbfa6fe1d41",
+    "default_run": true,
+    "memory_probe": false
+  },
+  {
+    "id": "merge_invalid_role_oom",
+    "file": "merge_invalid_role_oom.json",
+    "bytes": 849,
+    "sha256": "171fe404aa2607716c2f29bc12be2b84c673df995c6db61802c3e972ae31c5ae",
+    "default_run": true,
+    "memory_probe": false
+  },
+  {
+    "id": "parts_r1_w127",
+    "file": "parts_r1_w127.json",
+    "bytes": 8203,
+    "sha256": "3c274a4ea5fdf77a550dac134eb03d6e2a08489b34e27bdbf108e37fafd64461",
+    "default_run": true,
+    "memory_probe": true
+  },
+  {
+    "id": "parts_r1_w128",
+    "file": "parts_r1_w128.json",
+    "bytes": 8266,
+    "sha256": "cbeaf916dcbc867c8853faf0ec2782a52356af9b9c4101c515433608a9c20400",
+    "default_run": true,
+    "memory_probe": true
+  },
+  {
+    "id": "parts_r1_w129",
+    "file": "parts_r1_w129.json",
+    "bytes": 8329,
+    "sha256": "c88fe6e4fbda57888cb9f1d9bfdcd64b4b1a0f693f86529a7d82a1873af6e3c9",
+    "default_run": true,
+    "memory_probe": true
+  },
+  {
+    "id": "parts_r1_w1024",
+    "file": "parts_r1_w1024.json",
+    "bytes": 64739,
+    "sha256": "1efe2b462b610780901ec3692b2eabe337a66d1392dfde83de5702019285ed62",
+    "default_run": true,
+    "memory_probe": true
+  },
+  {
+    "id": "parts_r32_w129",
+    "file": "parts_r32_w129.json",
+    "bytes": 260320,
+    "sha256": "413bb55d3515a6126e254ee07522bea7ed86a021607153f386a01c0466dbf02e",
+    "default_run": true,
+    "memory_probe": true
+  },
+  {
+    "id": "parts_r128_w129",
+    "file": "parts_r128_w129.json",
+    "bytes": 1040733,
+    "sha256": "c54923852680a9b20333f3cc6caf270a5ac7929ef81fc056f6706ea462e8ea89",
+    "default_run": true,
+    "memory_probe": true
+  },
+  {
+    "id": "parts_r32_w512",
+    "file": "parts_r32_w512.json",
+    "bytes": 1032448,
+    "sha256": "a6c22be88d42eea4a3ff206c0a05358f99a32a9eab2697bd9971073c5be22317",
+    "default_run": true,
+    "memory_probe": true
+  },
+  {
+    "id": "same_instance_error_recovery",
+    "file": "same_instance_error_recovery.json",
+    "bytes": 3678,
+    "sha256": "196bc3d24d98caaf6bcea8d733a733db49234af492fe4e72948e7522a17960a4",
+    "default_run": true,
+    "memory_probe": false
+  }
+]

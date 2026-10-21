@@ -1,0 +1,112 @@
+{
+  "frozen": true,
+  "scope": "Synthetic benchmark input only; no API calls made by input preparation.",
+  "thinking": false,
+  "add_generation_prompt": true,
+  "add_special_tokens": false,
+  "token_encoding": "sha256(json.dumps(ids,separators=(comma,colon)).encode(ascii)); also raw u32 little endian SHA",
+  "common_history_messages": 3072,
+  "final_user_instruction_messages": 1,
+  "history_sha256": "bd92a74530cd22c6228d84e3e76d45a48e7bef26947d9f5474ea910b4c894c32",
+  "padding_units": {
+    "compact": 0,
+    "long_a": 192371,
+    "long_b": 243571
+  },
+  "padding_unit": {
+    "long_a": "wave ",
+    "long_b": "signal "
+  },
+  "template_sha256": {
+    "0012": "2ad469968493ff62065c26f49a6b12e5f6968ef51f6321bc5a7361c21c3cc477",
+    "0013": "0faf4f4050879f3c91ef0e63368cce8264fe627457fbe82dd3a98d9381122e10"
+  },
+  "fixed_body_fields": {
+    "temperature": 0,
+    "seed": 19,
+    "stream": true,
+    "stream_options": {
+      "include_usage": true
+    },
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "limits": [
+    "Long output requested, not guaranteed. Actual nonempty content and overlap must be observed; no automatic retry.",
+    "5ms sampled RSS is a lower bound; long padding tokenization can dominate peak and reduce proportional template saving.",
+    "Offline fixture uses production-equivalent normalized text content and object arguments; live tokenize exact-ID gate still required."
+  ],
+  "cases": [
+    {
+      "name": "compact",
+      "messages": 3073,
+      "tool_rounds": 1024,
+      "tool_results": 2048,
+      "tokens": 89228,
+      "body_sha256": "1ef9e001cb9bb8a219184773022448664b89ce2e6f7344e91922da9741570808",
+      "tokenize_sha256": "56788cebbf36f99ffda2e961a23b2d3b43249b7ff9d7c020c1919d299068f41a",
+      "ids_canonical_json_sha256": "95ae4cec9a259021748aef1165cfe53b875d85e2379d76efc9b4f7b46c2364bc",
+      "ids_u32le_sha256": "081adc8b6d6a9ad7e3c50676b41a373ba9004a37977b1809f36f78133450fec3",
+      "render_sha256": "3ae7b854512d3c3e3f2fe6142c6a6981c97a42cf6af4d13f51749612db7fcaa8",
+      "message_array_sha256": "fa2978b21fa404f2907f87efa9b121173bfa1c20930c1e8210c2dc0cd837f719",
+      "message_contents_sha256": "730a865e6175896eff1cbf0d93bc14530d11b23cb68976023e062db8362c2322",
+      "history_sha256": "bd92a74530cd22c6228d84e3e76d45a48e7bef26947d9f5474ea910b4c894c32",
+      "render_and_ids_exact_equal": true,
+      "sampled_extra_rss_mib": [
+        171.08203125,
+        53.3203125
+      ]
+    },
+    {
+      "name": "long_a",
+      "messages": 3073,
+      "tool_rounds": 1024,
+      "tool_results": 2048,
+      "tokens": 281600,
+      "body_sha256": "351e0a30be4d3143e17c5cdb2efb3f60b47f6d594ad3fb8aacc3f86426a9eb70",
+      "tokenize_sha256": "077be5103781f09e81f64780630832b272eb3ee3ac09ff8fe445d96e6a01be1a",
+      "ids_canonical_json_sha256": "8b82689c6151123c0e7e2e1aeb9b93a53f825842b4e697445a16656f4f800c4d",
+      "ids_u32le_sha256": "3aa0ad36d98c9ac894d54e9be588b6c2956fc5598ac1eba98badaa0367baedd5",
+      "render_sha256": "5f0c3d65c4ef9ebad921e9f1e075f0285c05744e40c58ef65de774655070640c",
+      "message_array_sha256": "9dacb210063d63dfca7e55f4ff21849e0cb3fd700ff2c5a7a91539eba7998358",
+      "message_contents_sha256": "a92466874cfb06bccb1f32cd2b278789cbdd38e1a590b5ea774eb3627119fdc1",
+      "history_sha256": "bd92a74530cd22c6228d84e3e76d45a48e7bef26947d9f5474ea910b4c894c32",
+      "render_and_ids_exact_equal": true,
+      "sampled_extra_rss_mib": [
+        174.98046875,
+        165.703125
+      ]
+    },
+    {
+      "name": "long_b",
+      "messages": 3073,
+      "tool_rounds": 1024,
+      "tool_results": 2048,
+      "tokens": 332800,
+      "body_sha256": "8c3ca36bd8de61b1d0ac03456bf6f0396557173f2b060f4cde3b018308e6aba0",
+      "tokenize_sha256": "3f6a7f71b294a9be7f1df2c1b1918deb4849a297743130e5e87e20deff67f078",
+      "ids_canonical_json_sha256": "4c26573a0f12be9a817c57ce7d14d71ce068e9e0a232af7e5f6c5c91c8e15ad4",
+      "ids_u32le_sha256": "879fe1e034ffcf125bf505aef453e9427ed766818e20ad077150ca44810287d3",
+      "render_sha256": "52331aaddaec46c9fde6e0547919c4f8ac6b5ebaab6ff11eb9ad8c116dc60b36",
+      "message_array_sha256": "b6019a1403822077d0027cfba9de1ba6d193759d7e94ecae49e4b1152f8060ff",
+      "message_contents_sha256": "9ab6c116acdba1fe81983f652727a6e7e67b0fd86a8df268802e6f82f73f1339",
+      "history_sha256": "bd92a74530cd22c6228d84e3e76d45a48e7bef26947d9f5474ea910b4c894c32",
+      "render_and_ids_exact_equal": true,
+      "sampled_extra_rss_mib": [
+        216.28125,
+        212.34765625
+      ]
+    }
+  ],
+  "model": "DeepSeek-V4.1-Flash-1017",
+  "http_json_serialization": "json.dumps(obj,separators=(comma,colon)).encode(); default ensure_ascii=True, insertion order preserved",
+  "http_files": {
+    "compact-sse512.json": "20f4dc0265dc512a124d8e25076dedb8940c2e24389e8d3a447a7d0d044cbc24",
+    "compact-sse8.json": "1daa7222850c191b3b3641d58b74513f350d5f4fde3891af7303ad44dc5484a2",
+    "long_a-sse512.json": "7095c15bfd0f401c8c2db57f3fbf32362ecbddf69507601c6e6976fdb5eb6e4d",
+    "long_a-sse8.json": "2f519ed7f1b62f2865a9b6e8ba85d93e24fc69ebbe43a039b414980ebeb39f31",
+    "long_b-sse512.json": "8b4c19aea1af0a26e656814b283a02f816b10f6adb636c844a6caec8c56ff94e",
+    "long_b-sse8.json": "e90478d31b850af9bc9e6682238a1a4cd71e6eb9866e1c5131a86ac9a5b58b7e"
+  }
+}

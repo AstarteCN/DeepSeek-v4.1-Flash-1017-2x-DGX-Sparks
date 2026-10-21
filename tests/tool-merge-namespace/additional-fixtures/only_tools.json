@@ -1,0 +1,1 @@
+{"id":"only_tools","messages":[{"role":"tool","content":"甲"},{"role":"tool","content":"乙"}],"thinking":true}
