@@ -1,0 +1,50 @@
+--- a/zig/src/core/template/eval.zig
++++ b/zig/src/core/template/eval.zig
+@@ -25,6 +25,7 @@
+     out: *std.ArrayList(u8),
+     depth: usize = 0,
+     acc: std.ArrayList(u8) = .empty,
++    list_acc: std.ArrayList(Value) = .empty,
+     // Diagnostic only: requested Value cells in list concatenations, not live heap bytes.
+     list_concat_values: u64 = 0,
+     memory_diag: bool = false,
+@@ -53,6 +54,30 @@
+     }
+     c.acc.appendSliceAssumeCapacity(r);
+     return c.acc.items;
++}
++
++// A concat result is immutable, but its unused tail can be appended to without
++// changing any previously published prefix slice. Branches and growth always
++// allocate another buffer; the render arena keeps old aliases alive.
++const list_acc_min = 128;
++
++fn isListAcc(c: *const Ctx, items: []const Value) bool {
++    return items.len > 0 and items.ptr == c.list_acc.items.ptr and items.len == c.list_acc.items.len;
++}
++
++fn joinList(c: *Ctx, l: []const Value, r: []const Value) Error![]const Value {
++    const a = c.rt.a;
++    if (l.len < list_acc_min and !isListAcc(c, l)) return std.mem.concat(a, Value, &.{ l, r });
++    const needed = std.math.add(usize, l.len, r.len) catch return error.OutOfMemory;
++    const fresh = !isListAcc(c, l);
++    if (fresh or needed > c.list_acc.capacity) {
++        const capacity = if (fresh) needed else std.math.mul(usize, needed, 2) catch needed;
++        var grown: std.ArrayList(Value) = try .initCapacity(a, capacity);
++        grown.appendSliceAssumeCapacity(l);
++        c.list_acc = grown;
++    }
++    c.list_acc.appendSliceAssumeCapacity(r);
++    return c.list_acc.items;
+ }
+ 
+ const Flow = enum { normal, brk, cont };
+@@ -356,7 +381,7 @@
+     }
+     if (op == .add and l == .list and r == .list and l.list.seq == r.list.seq and (l.list.seq == .list or l.list.seq == .tuple)) {
+         if (c.memory_diag) c.list_concat_values += @intCast(l.list.items.len + r.list.items.len);
+-        return rt.list(try std.mem.concat(rt.a, Value, &.{ l.list.items, r.list.items }), l.list.seq);
++        return rt.list(try joinList(c, l.list.items, r.list.items), l.list.seq);
+     }
+     if (op == .mul and (l == .str or l == .list or r == .str or r == .list) and (isNum(l) or isNum(r)) and l != .float and r != .float) {
+         const seq = if (isNum(l)) r else l;

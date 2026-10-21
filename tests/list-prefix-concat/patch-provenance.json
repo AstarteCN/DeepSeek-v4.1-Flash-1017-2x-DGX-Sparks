@@ -1,0 +1,11 @@
+{
+  "status": "experimental; offline CPU validation; GPU serving validation pending",
+  "base_fork_commit": "3368a0f5423b0fb28f51fde7461522dba5e43d21",
+  "base_series_manifest": "../../zig/patches/hf-scratch-series.json",
+  "extra_patch": "../../zig/patches/0012-list-concat-prefix.patch",
+  "extra_patch_sha256": "7af10b50e456cef53f4b0b75e600e4eb50de7d4dd672caf99fa16a677a7703e6",
+  "changed_source": "zig/src/core/template/eval.zig",
+  "before_sha256": "3470e155a5ca9d89f8ba317da7c6a28a2d49090d43d0056110ae63d6d1e41a9d",
+  "after_sha256": "2f25efef0e4bd95a08f285739528e1d9e29a1cbad0e73b5ce80de718573e9355",
+  "local_apply_check": true
+}
