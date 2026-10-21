@@ -1,7 +1,9 @@
 # Immutable list prefix candidate (0012)
 
 Experimental branch `experiment/list-prefix-concat`, based on stable fork commit
-`3368a0f5423b0fb28f51fde7461522dba5e43d21`. GPU serving validation is pending.
+`3368a0f5423b0fb28f51fde7461522dba5e43d21`. A
+[bounded GPU-serving regression](runtime-results.md) has completed; broader
+capacity and long-running validation remain outstanding.
 The stable `fix/hf-scratch-arena` branch is unchanged.
 
 The DeepSeek chat template grows `ns.msgs = ns.msgs + [message]`. Copying the whole
@@ -81,8 +83,8 @@ Independent static review found no blocking issue in the frozen patch. Review do
 not replace runtime regression. `list_concat_values` remains a logical output-size
 counter; it must not be interpreted as physical cells copied after this patch.
 
-The candidate is isolated. GPU serving validation and long-history/two-lane regression
-must pass before changing a stable default. Keep the accepted 0011 image for rollback;
+The candidate remains experimental after its bounded serving regression. The
+accepted 0011 deployment was restored and remains the stable default. Keep it for rollback;
 no model weights, deployment settings, network/security settings or memory protection
 thresholds are part of this patch.
 

@@ -1,5 +1,5 @@
 {
-  "status": "experimental; offline CPU validation; GPU serving validation pending",
+  "status": "experimental; offline CPU and bounded GPU-serving regression complete; broader capacity and long-running validation pending",
   "base_fork_commit": "3368a0f5423b0fb28f51fde7461522dba5e43d21",
   "base_series_manifest": "../../zig/patches/hf-scratch-series.json",
   "extra_patch": "../../zig/patches/0012-list-concat-prefix.patch",
