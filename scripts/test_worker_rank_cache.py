@@ -10,7 +10,8 @@ import sys
 import tempfile
 import unittest
 
-ROOT = Path(sys.argv.pop(1)).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parents[1]
+ROOT = (Path(sys.argv.pop(1)).resolve() if __name__ == '__main__' and len(sys.argv) > 1
+        else Path(__file__).resolve().parents[1])
 
 
 class WorkerRankCacheTest(unittest.TestCase):

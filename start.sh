@@ -47,7 +47,7 @@ DRY=0; [[ "${DRY_RUN:-0}" == 1 ]] && DRY=1
 for v in CONTEXT PARALLEL MAX_TOKENS TOP_K; do [[ "${!v}" =~ ^[1-9][0-9]*$ ]] || die "$v is a positive count, not ${!v}"; done
 (( CONTEXT <= 1048576 )) || die "CONTEXT is at most 1048576 (the model's window), not $CONTEXT"
 (( PARALLEL <= 16 )) || die "PARALLEL is 1 to 16 (the engine's streams), not $PARALLEL"
-[[ -z "$ROUND_ROWS" ]] || { [[ "$ROUND_ROWS" =~ ^[0-9]+$ ]] && (( ROUND_ROWS >= 16 && ROUND_ROWS <= 48 )); } || die "ROUND_ROWS is empty or 16 to 48, not $ROUND_ROWS"
+[[ -z "$ROUND_ROWS" ]] || { [[ "$ROUND_ROWS" =~ ^[0-9]+$ ]] && (( ROUND_ROWS == 16 )); } || die "ROUND_ROWS must be empty or 16: the pinned kit has no wider row kernels (issue #23), not $ROUND_ROWS"
 [[ -z "$THINKING_BUDGET" || "$THINKING_BUDGET" =~ ^[1-9][0-9]*$ ]] || die "THINKING_BUDGET is a positive count of reasoning tokens (or empty for no cap), not $THINKING_BUDGET"
 [[ -z "$REASONING_EFFORT" || "$REASONING_EFFORT" =~ ^(low|medium|high|xhigh)$ ]] || die "REASONING_EFFORT is low, medium, high or xhigh (or empty), not $REASONING_EFFORT"
 [[ "$MIN_AVAIL_GIB" =~ ^[0-9]+$ ]] || die "MIN_AVAIL_GIB is a whole number of GiB (0 turns it off), not $MIN_AVAIL_GIB"
