@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Repair the default checkpoint pin independently of #38's credential-handling changes: the removed `6d54be4f` revision returns HTTP 404, while `45ee5d0f` resolves with all 39 checkpoint shards. Reported by **ajbmachon** (#36) and **yume-arasaki** (#38). `RUN_HF_PIN_CHECK=1 python3 scripts/test_checkpoint_pin.py` checks the public Hub revision and required files; it fails on the removed pin.
+
 - Reject `ROUND_ROWS` above 16 before starting: the pinned kit has no `_rowmm_parts` specialization above 16, so larger configured rounds could fail with `CudaFailed` (issue [#23](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/23), reported by **Nollio**). CPU regression tests cover the unsupported settings; wider kernels remain under review in #31.
 
 - Check the worker's model/kit/token-map file view before stopping or launching ranks, including cached preparation; reject directories as required files. By **aoeu10**, pull request [#25](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/pull/25), with CPU regression coverage.
