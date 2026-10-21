@@ -18,6 +18,11 @@
   positions three 386K-token conversations cannot all stay resident (issue [#16](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/16) is the picture case of the same
   placement). The RoPE tables are sized by the window now, not the pool (the kit's tables already hold 1,114,112 rows). The extra KV is host memory: about 0.9 GiB a rank per 1,048,576 positions
   (`POOL=2097152`: head idle `MemAvailable` 6.76 to 5.71 GiB, lowest during a cold 96K-token prompt 5.89 to 4.49 GiB; worker 8.63 to 7.43 and 8.60 to 7.33). The patch applies on its own. By **ezoushen**, pull request [#10](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/pull/10).
+- `zig/patches/0001` (the prefill indexer split between the two ranks) runs by default in prompt chunks that end at 65,536
+  compressed keys or more (token 131,072), where the indexer's work outgrows the all-gather of its selections; below that the
+  replicated loop runs as before. Cold prefill against the image without it (three alternating pairs, both images built on the
+  head): +4.25% at 256K and +7.46% at 400K; 8K/32K prefill, decode and four streams within 0.9%. Replies keep their bits.
+  `TF_DS_IDX_SPLIT=1` splits every eligible chunk as before, any other value turns it off.
 
 - `prepare.sh`'s "cannot mount ... over NFS" error shows the last four lines of docker's output, not only the last (which was always
   docker's "Run 'docker run --help'" line, never the reason); the README's NFS section says what to check (issue
