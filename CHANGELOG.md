@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Optional `systemd/dsv41-tensorfold.service` and `docs/systemd.md`: a manually configured user service for the existing
+  foreground launcher, with `PREPARE=0`, a 60-second failure restart delay and at most three starts in 30 minutes.
+  Nothing installs or enables it automatically. Unit validation and opt-in transient stub tests cover failure exits,
+  the start limit, successful exit and an explicit stop. Requested by **m-naoki-m**, issue
+  [#32](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/32).
+
 - Document shared-pool residency (#20, **meleesciony**), cached versus computed prefill, and effort/budget limits for recurring reasoning-loop questions (#33, **Lcys**; #37, **koniaik**).
 
 - Bound RDMA idle/nap settings in both the launcher and engine; reject invalid or excessively long sleeps. Added regressions fail on the original #26 parser. The idle back-off is by **MykhailoTamarin**, pull request [#26](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/pull/26).

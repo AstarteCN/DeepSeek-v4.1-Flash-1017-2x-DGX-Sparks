@@ -21,6 +21,8 @@ or off, and **DSpark** speculative decoding from the checkpoint's own draft bloc
 - API model id: `DeepSeek-V4.1-Flash-1017`, port 8888
 - Engine: TensorFold native (Zig 0.17.0), BertholomusAI's `dsv41` family at TP=2, one rank on each Spark
 - One command on the first Spark: `./start.sh` sets up both Sparks and starts both ranks; `./stop.sh` stops them
+- Optional [systemd user service](docs/systemd.md): supervise both ranks with preparation disabled, delayed restarts
+  and a start limit. Copy and enable it manually; the recipe does not install a service.
 - Optional `ABLIT=1`: keeps Mia EAQ 2.9 bpw and applies the matching [Keys overlay by drowzeys](https://huggingface.co/drowzeys/keys-DeepSeek-V4.1-Flash-1017-Abliterated).
   Requires your Hugging Face token and access to that gated repository; see [Abliterated mode](#abliterated-mode).
 
