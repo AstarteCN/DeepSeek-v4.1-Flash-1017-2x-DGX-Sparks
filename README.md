@@ -330,7 +330,13 @@ Settings come from the environment, `scripts/local.sh` or `.env`; the defaults a
 Extra arguments to `./start.sh` go to rank 0's `tensorfold-native serve` after the defaults; every `TENSORFOLD_*` and
 `TF_DS_*` variable you set goes to both ranks. Images are always on (rank 0 runs the vision tower).
 
+For agent jobs that loop at `reasoning_effort: "max"`, try `"high"` with the same request and compare both reasoning and tool-call output (#33, #37). The pinned engine maps `high` to 75, `xhigh` to 88 and `max` to 100; the HTTP field accepts the named efforts, not arbitrary integers. No universal `THINKING_BUDGET` is validated for agent tasks: closing the reasoning block does not guarantee a tool call or stop repetition, and a small budget can cut a plan short. A client's explicit `max_tokens` / `max_completion_tokens` takes precedence over the server default; bound it in the request when needed. These reports alone do not establish that quantization caused the loop.
+
 ## Memory and safety
+
+`CONTEXT` limits one request and, when `POOL` is empty, also sizes the shared pool of KV positions. Lowering it can evict conversations even when each conversation fits individually: several histories compete for the same positions. `POOL` can now keep more positions than the request window, but uses additional memory on both ranks; set `POOL`, not raw `TF_DS_POOL` / `TF_DS_WINDOW`. The separate prompt-state budget (512 MiB by default) does not add KV positions, and increasing it alone cannot fix an undersized pool. Placement still retires the oldest kept states, so a larger pool does not guarantee that an idle coordinator survives a succession of other conversations (#20, #27).
+
+“Computed prefill” counts prompt tokens processed again; “cached prefill” counts reused prompt tokens. Fresh unrelated prompts, including the default randomized `tools/bench.py` workload, are expected to have no cache hits. For a continuing long conversation, check the server's cached-token counters and use `python3 tools/prompt_reuse.py --require-counter`; a dashboard showing zero may also mean it does not read the server's counter. Short prompts may not retain a snapshot.
 
 A Spark's GPU shares its memory with the host. A rank that takes all of it does not get a clean error: the machine stops
 answering and has to be power-cycled (this happened once, with the engine's reserve lowered to 10 GiB). So:

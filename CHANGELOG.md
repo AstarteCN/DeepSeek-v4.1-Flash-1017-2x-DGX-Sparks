@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Document shared-pool residency (#20, **meleesciony**), cached versus computed prefill, and effort/budget limits for recurring reasoning-loop questions (#33, **Lcys**; #37, **koniaik**).
+
+- Bound RDMA idle/nap settings in both the launcher and engine; reject invalid or excessively long sleeps. Added regressions fail on the original #26 parser. The idle back-off is by **MykhailoTamarin**, pull request [#26](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/pull/26).
+- Keep both ranks' pool and RoPE window consistent: raw `TF_DS_POOL` / `TF_DS_WINDOW` exports cannot override the launcher's `POOL` / `CONTEXT` mapping. A regression exercises conflicting exports against both rank settings.
+
 - Repair the default checkpoint pin independently of #38's credential-handling changes: the removed `6d54be4f` revision returns HTTP 404, while `45ee5d0f` resolves with all 39 checkpoint shards. Reported by **ajbmachon** (#36) and **yume-arasaki** (#38). `RUN_HF_PIN_CHECK=1 python3 scripts/test_checkpoint_pin.py` checks the public Hub revision and required files; it fails on the removed pin.
 
 - Reject `ROUND_ROWS` above 16 before starting: the pinned kit has no `_rowmm_parts` specialization above 16, so larger configured rounds could fail with `CudaFailed` (issue [#23](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/issues/23), reported by **Nollio**). CPU regression tests cover the unsupported settings; wider kernels remain under review in #31.
@@ -22,7 +27,7 @@
   compressed keys or more (token 131,072), where the indexer's work outgrows the all-gather of its selections; below that the
   replicated loop runs as before. Cold prefill against the image without it (three alternating pairs, both images built on the
   head): +4.25% at 256K and +7.46% at 400K; 8K/32K prefill, decode and four streams within 0.9%. Replies keep their bits.
-  `TF_DS_IDX_SPLIT=1` splits every eligible chunk as before, any other value turns it off.
+  `TF_DS_IDX_SPLIT=1` splits every eligible chunk as before, any other value turns it off. By **aaa4xu**, pull request [#35](https://github.com/MiaAI-Lab/DeepSeek-v4.1-Flash-1017-2x-DGX-Sparks/pull/35).
 
 - `zig/patches/0010-rdma-idle-nap.patch` and `RDMA_IDLE_S` / `RDMA_NAP_US` (on by default; recipe 2 s quiet, 500 µs
   nap; the patch's engine fallback is 100 µs): the RDMA gather's proxy naps once the engine is idle instead of spinning a
