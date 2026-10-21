@@ -1,5 +1,9 @@
 # Bounded GPU-serving regression
 
+Historical experiment report: this run restored 0011. The subsequent confirmed
+0012 default integration is documented [separately](../../docs/list-prefix-integration.md).
+Promotion does not broaden the coverage or conclusions below.
+
 The 0012 candidate completed a bounded run of eight inference requests and three
 tokenization requests in approximately 455 seconds. The accepted 0011 deployment
 was restored afterward. This remains an experiment; the stable fork branch is

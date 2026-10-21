@@ -1,5 +1,8 @@
 # Reproducing the scratch-lifetime build
 
+This document describes the 0011 baseline. The integrated 0012 extension and its
+full patch order are recorded in [list-prefix integration](list-prefix-integration.md).
+
 This fork preserves the MiaAI recipe and attribution. Its additional behavior
 change is `0011-hf-reclaiming-scratch.patch`; the preceding diagnostic additions
 are optional logging and counters. No published engine image is supplied here.

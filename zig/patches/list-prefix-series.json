@@ -1,0 +1,87 @@
+{
+  "recipe_base": "31eea4608f8bb292a92e2f7a1db400e928620c78",
+  "serving_repository": "https://github.com/bertholomus/TensorFold",
+  "serving_ref": "629c524a0ea57512a5342abb498d1b7c25353343",
+  "inputs_ref": "59402086381a42c74d53053443224eec2790b4c5",
+  "kernel_kit_ref": "abe07c7d509a0199cc7fec15263be2aa52ac652f",
+  "zig_version": "0.17.0",
+  "apply_order": [
+    {
+      "file": "0001-c7-indexer-split.patch",
+      "sha256": "72765ce89aab25a5dc20e01c828a8903e6a957a0ceea5c93042cf3835fe7832b"
+    },
+    {
+      "file": "0002-c3-engram-lanes.patch",
+      "sha256": "bb154554020c45e54ad3c83f03a89320f460bdbe562eb7a417d8a4a91141d456"
+    },
+    {
+      "file": "0004-call-gate.patch",
+      "sha256": "285a2b02e8018ecea32a4920b2e2186f4e382ab6340036cc6deaf492a1920fd6"
+    },
+    {
+      "file": "0005-prefill-interleave.patch",
+      "sha256": "941adac2471a64c47d6e8c45d82487be3064f0f40804d2ec4b530db591c8a017"
+    },
+    {
+      "file": "0006-image-prompt-cache.patch",
+      "sha256": "971335ae5869271d34329421e6f6ec3b9903cabaee53e8b14a09c9dd8d2dcd2e"
+    },
+    {
+      "file": "0007-graph-allocation-diagnostics.patch",
+      "sha256": "ba405860521f935cd90bc20d928df35c6d3f93ade012d96e5a3aa56c7691ad48"
+    },
+    {
+      "file": "0008-host-template-diagnostics.patch",
+      "sha256": "17a7bbfa6f7da33505788ed261a1ad49f3a6d6961af3c3a49c6ab2bb01cd7e02"
+    },
+    {
+      "file": "0009-memory-arena-diagnostics.patch",
+      "sha256": "50c9753e99ea7ada8eb37b1298cfbf1a6ad84dc3b47545c36753b34b50a7364a"
+    },
+    {
+      "file": "0010-http-connection-memory-diagnostics.patch",
+      "sha256": "a51a081778db6651027a5911d4c39906a9d0583c3ac580cb7d9dc7dedf3e1d82"
+    },
+    {
+      "file": "0010a-memory-diag-env-shadow-fix.patch",
+      "sha256": "dc0f347cff3cf32c5cc30f2066c7d7255c0f56d68484686a8c4683dc3f297b41"
+    },
+    {
+      "file": "0011-hf-reclaiming-scratch.patch",
+      "sha256": "ba8f28643cdf24083704137cbc2b5e2a216840985870762b048584f60b802097"
+    },
+    {
+      "file": "0012-list-concat-prefix.patch",
+      "sha256": "7af10b50e456cef53f4b0b75e600e4eb50de7d4dd672caf99fa16a677a7703e6"
+    }
+  ],
+  "patched_source_sha256": {
+    "zig/src/core/engine_api.zig": "2397924f7f3cdfbeb3e4a05fc9904ea0f59a9fa8bbd96f6cbfdde333282c97b5",
+    "zig/src/core/lane_host.zig": "98810e260080b95f7933283c135c0726c07b02a13cf784b47d19bb39a9947c89",
+    "zig/src/core/lane_host_reuse_test.zig": "0fd30ca9a22305ef8c4b9d8705cc0e26356f65de6faa991bfdca6bf9c2e15f4e",
+    "zig/src/core/lanes/call_gate.zig": "02bdb20a0732719770f57290b8bb6c933446f0746320e555e8d9381e74afb937",
+    "zig/src/core/lanes/engine.zig": "d537f361c451a94ff073fe98886ee6a387154ea7df90d1c2a882af556ca29df5",
+    "zig/src/core/lanes/fake.zig": "b98e5571fc1162988219d081e276601edda08c6eefe775f71ba4f95e7f49772f",
+    "zig/src/core/lanes/stream.zig": "b24553dfb464d8ba1b44c0a6d7a4ac3a53a4fb5dd558390bfc0f0c3d550bdd57",
+    "zig/src/core/template/eval.zig": "2f25efef0e4bd95a08f285739528e1d9e29a1cbad0e73b5ce80de718573e9355",
+    "zig/src/core/template/template.zig": "378d910ceae3dad911ce2cd7779d1006355c5da06865c6b76dd5b9a1a15a6056",
+    "zig/src/families/dsv41/draft.zig": "9d36fa582ef92c4984dfdf54bbe4cd1217a9c4075939a85597620b4d080f303f",
+    "zig/src/families/dsv41/lanes.zig": "d1030d8503c44d34ee839b44edb1f43e1d03e23aaf85c536317279d3e7dd2cad",
+    "zig/src/families/dsv41/model.zig": "6b2f3b35971176683a54f3e88a635ab9862c78cb33c3b3ac4561ebdbc443f56a",
+    "zig/src/families/dsv41/prompt.zig": "9900a27f0aaa75da1cd5d537d49d9acccfc4fedbcef3826c461423c77d73c15e",
+    "zig/src/families/dsv41/round.zig": "ae416023c0c9c37fced2881a43e0feaf0dff0a57ef1f1b25423a2ebde12fe281",
+    "zig/src/native/cuda.zig": "8e86d5c8b2d465b16b5b6871b31c03ec64918f564e8000d8a1984ac17b10ef4b",
+    "zig/src/server/chat.zig": "3750fda622ebba1f1a5f2b31b8514776abc94c708174844ca69a51bccf141285",
+    "zig/src/server/hf_text.zig": "c3d5a1c288ea56546ff23a3d2d6bdc7604f06f7bfbe4423720ae234f50c887bf",
+    "zig/src/server/memory_diag.zig": "4a02f08c366b4ba8530ea954ebb013d05bfacb3cb7bfb57cd100094cfe1285d3",
+    "zig/src/server/prompt.zig": "0c10ff9ebdadacae91ebb13867356c2fe1bbd77069fad4205e2f9cdfcc74292e",
+    "zig/src/server/server.zig": "20e58ea59cd27920cdb73109ac92ef94e6fdb94ff29c5abd224e46c452694f44"
+  },
+  "integration_status": "integrated default after bounded validation; broader capacity and long-running validation pending",
+  "baseline_manifest": "hf-scratch-series.json",
+  "baseline_manifest_sha256": "5fe2ea0a7723bf012210f672c10a953043884efb5645cb136d92a961412617b9",
+  "observed_validated_binary_sha256": {
+    "tensorfold-native": "c4eb359824af3b594000f9889713a000d4a34aea20a7ab2ab58efe8a77902b98",
+    "tf-dsv41-lanes": "4358a917d68b06d1b9c3f850c115c83a17c726acf6aacf8f385e322d05f695b2"
+  }
+}

@@ -1,10 +1,10 @@
 # Immutable list prefix candidate (0012)
 
-Experimental branch `experiment/list-prefix-concat`, based on stable fork commit
-`3368a0f5423b0fb28f51fde7461522dba5e43d21`. A
-[bounded GPU-serving regression](runtime-results.md) has completed; broader
-capacity and long-running validation remain outstanding.
-The stable `fix/hf-scratch-arena` branch is unchanged.
+Integration branch `fix/list-prefix-concat` promotes the tested 0012 source from
+`experiment/list-prefix-concat`. The [coordinated integration](../../docs/list-prefix-integration.md)
+completed after the [bounded GPU-serving regression](runtime-results.md). Broader
+capacity and long-running validation remain outstanding. The earlier
+`fix/hf-scratch-arena` branch remains available as the 0011 baseline.
 
 The DeepSeek chat template grows `ns.msgs = ns.msgs + [message]`. Copying the whole
 list for every append retains a quadratic number of Value cells in a render arena.
@@ -83,8 +83,9 @@ Independent static review found no blocking issue in the frozen patch. Review do
 not replace runtime regression. `list_concat_values` remains a logical output-size
 counter; it must not be interpreted as physical cells copied after this patch.
 
-The candidate remains experimental after its bounded serving regression. The
-accepted 0011 deployment was restored and remains the stable default. Keep it for rollback;
+The bounded experiment restored 0011 before the later confirmed 0012 integration.
+0012 is now the selected default; keep the accepted 0011 artifact set for rollback.
+The validation limits above still apply;
 no model weights, deployment settings, network/security settings or memory protection
 thresholds are part of this patch.
 

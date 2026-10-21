@@ -1,5 +1,10 @@
 # zig/patches
 
+The `fix/list-prefix-concat` integration branch includes 0012 in the normal patch
+glob. See its [integration and validation limits](../../docs/list-prefix-integration.md)
+and [complete twelve-patch source manifest](list-prefix-series.json). Earlier
+baseline documentation and attribution are retained below.
+
 This fork additionally carries the HfText scratch-lifetime fix and its complete
 opt-in diagnostic series. See [build and patch-order notes](../../docs/hf-scratch-build.md),
 [source manifest](hf-scratch-series.json), and the
