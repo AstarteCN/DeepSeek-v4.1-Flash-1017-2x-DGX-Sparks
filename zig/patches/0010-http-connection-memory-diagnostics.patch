@@ -1,0 +1,212 @@
+--- a/zig/src/server/server.zig
++++ b/zig/src/server/server.zig
+@@ -18,6 +18,7 @@
+ const tool_specs = @import("tool_specs.zig");
+ const chunk_plan = @import("chunk_plan.zig");
+ const log = @import("log.zig");
++const memory_diag = @import("memory_diag.zig");
+ const Value = json.Value;
+ const Cx = errors.Cx;
+ const Allocator = std.mem.Allocator;
+@@ -276,18 +277,36 @@
+         if (conn.auth_enabled) conn.hook = .{ .ctx = srv, .call = countReply };
+         var arena: std.heap.ArenaAllocator = .init(srv.gpa);
+         defer arena.deinit();
++        memory_diag.beginConnection(&arena);
++        defer memory_diag.endConnection();
+         while (true) {
+-            _ = arena.reset(.retain_capacity);
++            memory_diag.beforeReset();
++            const reset_ok = arena.reset(.retain_capacity);
++            memory_diag.afterReset(reset_ok);
+             const a = arena.allocator();
+-            const outcome = conn.readRequest(a, true) catch break;
++            const outcome = conn.readRequest(a, true) catch {
++                memory_diag.note("request_read_error");
++                break;
++            };
+             switch (outcome) {
+-                .closed => break,
+-                .handled => if (conn.close) break else continue,
++                .closed => {
++                    memory_diag.note("request_read_closed");
++                    break;
++                },
++                .handled => {
++                    memory_diag.note("request_read_handled");
++                    if (conn.close) break else continue;
++                },
+                 .ready => {},
+             }
+-            if (!srv.authenticate(&conn, a)) break;
++            memory_diag.note("request_head_ready");
++            if (!srv.authenticate(&conn, a)) {
++                memory_diag.note("request_auth_rejected");
++                break;
++            }
+             if (conn.header("Expect")) |expect| if (std.ascii.eqlIgnoreCase(expect, "100-continue") and std.mem.order(u8, conn.version, "HTTP/1.1") != .lt) conn.sendContinue();
+             routes.dispatch(srv, &conn, a);
++            memory_diag.note("request_dispatch_end");
+             if (conn.close or conn.broken) break;
+         }
+     }
+--- a/zig/src/server/chat.zig
++++ b/zig/src/server/chat.zig
+@@ -11,6 +11,7 @@
+ const log = @import("log.zig");
+ const ids = @import("ids.zig");
+ const clock = @import("clock.zig");
++const memory_diag = @import("memory_diag.zig");
+ const Server = @import("server.zig").Server;
+ const chunk_plan = @import("chunk_plan.zig");
+ const Value = json.Value;
+@@ -138,6 +139,10 @@
+ 
+ /// Render ``input`` and run every check that can refuse it, before anything reaches the client or the engine.
+ pub fn prepare(srv: *Server, cx: *Cx, input: Input, gone: anytype) Failure!Prepared {
++    const memory_sample = memory_diag.beginPrepare(cx.a, "chat_prepare");
++    var memory_ok = false;
++    var memory_tokens: ?usize = null;
++    defer memory_diag.endPrepare(memory_sample, memory_ok, memory_tokens);
+     const a = cx.a;
+     const io = srv.io;
+     const received = nowNs(io);
+@@ -155,6 +160,7 @@
+     if (input.prompt != null) thinking = false;
+     const effort = srv.effortFor(if (f.get("reasoning_effort")) |e| (if (e == .string) e.string else null) else null);
+     const rendered = try prompt_mod.prepare(srv, cx, input, thinking, effort);
++    memory_tokens = rendered.ids.len;
+     if (gone.check()) return error.Cancelled;
+     if (rendered.ids.len == 0) return cx.refuse("rendered prompt is empty");
+     const window: i64 = srv.info.context_window;
+@@ -199,6 +205,7 @@
+             request.think_end = srv.think_close_end;
+         }
+     }
++    memory_ok = true;
+     return .{ .input = input, .request = request, .prompt_len = rendered.ids.len, .received = received, .thinking = thinking, .effort = effort, .sampled = sampling != null, .drafts = drafts, .stops = stops_opt, .preparing = preparing };
+ }
+ 
+--- a/zig/src/server/prompt.zig
++++ b/zig/src/server/prompt.zig
+@@ -9,6 +9,7 @@
+ const api = @import("engine_api");
+ const Value = json.Value;
+ const Cx = errors.Cx;
++const memory_diag = @import("memory_diag.zig");
+ 
+ /// `key`: with images, the prompt cache's ids for the prompt (see `cacheKey`); empty without.
+ pub const Rendered = struct { ids: []const u32, history_len: usize = 0, images: []const api.Image = &.{}, key: []const u32 = &.{} };
+@@ -17,6 +18,10 @@
+ 
+ /// ``render_prompt_ids``: messages normalized for this template, rendered, and a dangling ``<think>`` closed.
+ pub fn renderIds(srv: *Server, cx: *Cx, messages: Value, tools: []const Value, thinking: bool, effort: ?[]const u8, generation: bool) errors.Refused![]const u32 {
++    const memory_sample = memory_diag.beginPrepare(cx.a, "render_ids");
++    var memory_ok = false;
++    var memory_tokens: ?usize = null;
++    defer memory_diag.endPrepare(memory_sample, memory_ok, memory_tokens);
+     const normalized = try messages_mod.toolArguments(cx, try messages_mod.normalize(cx, messages, srv.late_system, srv.needs_user_after_tool));
+     var problem: []const u8 = "";
+     const options: model_text.RenderOptions = .{
+@@ -40,6 +45,8 @@
+             if (close.len == 1) ids = try std.mem.concat(cx.a, u32, &.{ ids, close });
+         }
+     }
++    memory_tokens = ids.len;
++    memory_ok = true;
+     return ids;
+ }
+ 
+--- /dev/null
++++ b/zig/src/server/memory_diag.zig
+@@ -0,0 +1,90 @@
++//! Opt-in HTTP connection arena capacity diagnostics. Never logs request contents or identities.
++//! queryCapacity reports reserved capacity, not live/used bytes; read only on the owning connection thread.
++const std = @import("std");
++
++const Connection = struct {
++    arena: *std.heap.ArenaAllocator,
++    id: u64,
++    request_attempt: u64 = 0,
++    prepare_attempt: u64 = 0,
++};
++
++var next_connection_id: std.atomic.Value(u64) = .init(1);
++threadlocal var connection: ?Connection = null;
++
++pub fn enabled() bool {
++    return if (std.c.getenv("TF_DS_MEMORY_DIAG")) |v| std.mem.eql(u8, std.mem.span(v), "1") else false;
++}
++
++pub fn beginConnection(arena: *std.heap.ArenaAllocator) void {
++    if (!enabled()) return;
++    connection = .{ .arena = arena, .id = next_connection_id.fetchAdd(1, .monotonic) };
++    note("connection_open");
++}
++
++/// Runs before the caller's existing arena.deinit; does not free/reset anything.
++pub fn endConnection() void {
++    note("connection_close_before_deinit");
++    connection = null;
++}
++
++/// A read attempt includes handled/closed requests; the number is not an engine request ID.
++pub fn beforeReset() void {
++    if (connection) |*c| c.request_attempt +%= 1;
++    note("before_retain_reset");
++}
++
++pub fn afterReset(ok: bool) void {
++    const c = connection orelse return;
++    std.debug.print("[tf-memory-diag] connection={d} request_attempt={d} phase=after_retain_reset capacity_bytes={d} reset_ok={any}\n", .{
++        c.id, c.request_attempt, c.arena.queryCapacity(), ok,
++    });
++}
++
++pub fn note(comptime phase: []const u8) void {
++    const c = connection orelse return;
++    std.debug.print("[tf-memory-diag] connection={d} request_attempt={d} phase={s} capacity_bytes={d}\n", .{
++        c.id, c.request_attempt, phase, c.arena.queryCapacity(),
++    });
++}
++
++pub const Preparation = struct {
++    connection_id: u64,
++    request_attempt: u64,
++    prepare_attempt: u64,
++    kind: []const u8,
++    arena: ?*std.heap.ArenaAllocator,
++    capacity_before: usize,
++};
++
++/// The allocator check avoids attributing a scratch allocator's work to the connection arena.
++/// No HTTP binding (for example a background thread) means no connection-scoped sample.
++pub fn beginPrepare(a: std.mem.Allocator, comptime kind: []const u8) ?Preparation {
++    if (connection) |*c| {
++        c.prepare_attempt +%= 1;
++        const owner = c.arena.allocator();
++        const same_arena = a.ptr == owner.ptr and a.vtable == owner.vtable;
++        const p: Preparation = .{
++            .connection_id = c.id,
++            .request_attempt = c.request_attempt,
++            .prepare_attempt = c.prepare_attempt,
++            .kind = kind,
++            .arena = if (same_arena) c.arena else null,
++            .capacity_before = if (same_arena) c.arena.queryCapacity() else 0,
++        };
++        std.debug.print("[tf-memory-diag] connection={d} request_attempt={d} prepare_attempt={d} kind={s} phase=prepare_before capacity_known={any} capacity_bytes={d}\n", .{
++            p.connection_id, p.request_attempt, p.prepare_attempt, p.kind, p.arena != null, p.capacity_before,
++        });
++        return p;
++    }
++    return null;
++}
++
++pub fn endPrepare(preparation: ?Preparation, ok: bool, tokens: ?usize) void {
++    const p = preparation orelse return;
++    const capacity_after = if (p.arena) |a| a.queryCapacity() else 0;
++    std.debug.print("[tf-memory-diag] connection={d} request_attempt={d} prepare_attempt={d} kind={s} phase=prepare_after ok={any} capacity_known={any} capacity_before_bytes={d} capacity_after_bytes={d} tokens_known={any} tokens={d}\n", .{
++        p.connection_id, p.request_attempt, p.prepare_attempt, p.kind, ok, p.arena != null,
++        p.capacity_before, capacity_after, tokens != null, tokens orelse 0,
++    });
++}

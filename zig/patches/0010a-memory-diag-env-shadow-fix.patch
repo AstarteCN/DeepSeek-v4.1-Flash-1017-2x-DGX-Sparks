@@ -1,0 +1,11 @@
+--- a/zig/src/core/template/template.zig
++++ b/zig/src/core/template/template.zig
+@@ -105,7 +105,7 @@
+     const a = arena.allocator();
+     var out: std.ArrayList(u8) = .empty;
+     var vars: v.Map = .empty;
+-    const memory_diag = if (std.c.getenv("TF_DS_MEMORY_DIAG")) |v| std.mem.eql(u8, std.mem.span(v), "1") else false;
++    const memory_diag = if (std.c.getenv("TF_DS_MEMORY_DIAG")) |diag_env| std.mem.eql(u8, std.mem.span(diag_env), "1") else false;
+     var c = eval.Ctx{ .rt = .{ .a = a }, .vars = &vars, .out = &out, .memory_diag = memory_diag };
+     // Isolated CPU-only diagnostic build: dimensions only, never message contents.
+     defer if (memory_diag) std.log.info("host-template generation={any} messages={d} list_concat_values={d} list_concat_payload_bytes={d} value_size={d} output_bytes={d} template_arena_capacity_bytes={d}", .{

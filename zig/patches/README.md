@@ -1,5 +1,11 @@
 # zig/patches
 
+This fork additionally carries the HfText scratch-lifetime fix and its complete
+opt-in diagnostic series. See [build and patch-order notes](../../docs/hf-scratch-build.md),
+[source manifest](hf-scratch-series.json), and the
+[CPU regression harness](../../tests/hf-scratch/README.md). The original patch
+descriptions below remain upstream attribution and history.
+
 Patches to BertholomusAI's TensorFold fork at `TF_REF` (`scripts/config.sh`), applied in filename order by `zig/Dockerfile`
 (`git apply` in the checkout's root). The image tag changes with them.
 

@@ -1,0 +1,129 @@
+--- a/zig/src/families/dsv41/round.zig
++++ b/zig/src/families/dsv41/round.zig
+@@ -842,13 +842,16 @@
+ /// arguments as the eager round, so the same bytes.
+ pub const Graphs = struct {
+     gpa: std.mem.Allocator,
++    diag_enabled: bool = false,
++    capture_attempts: u64 = 0,
+     map: std.AutoHashMapUnmanaged(Key, Entry) = .empty,
+ 
+     pub const Key = struct { rows: u32, bucket: u64, stretch: u32 };
+     const Entry = struct { exec: cuda.graph.Exec, start: Carry, end: Carry };
+ 
+     pub fn init(gpa: std.mem.Allocator) Graphs {
+-        return .{ .gpa = gpa };
++        const enabled = if (std.c.getenv("TF_DS_GRAPH_DIAG")) |v| std.mem.eql(u8, std.mem.span(v), "1") else false;
++        return .{ .gpa = gpa, .diag_enabled = enabled };
+     }
+ 
+     pub fn deinit(g: *Graphs) void {
+@@ -861,6 +864,19 @@
+     /// The captured stretches.
+     pub fn count(g: *const Graphs) usize {
+         return g.map.count();
++    }
++
++    // Driver-owned graph memory is outside cuda.usage(); sample both without synchronizing.
++    fn diagnostic(g: *const Graphs, key: Key, e: *const Engine, phase: []const u8) void {
++        if (!g.diag_enabled) return;
++        var free_bytes: usize = 0;
++        var total_bytes: usize = 0;
++        const status = e.d.api.cuMemGetInfo_v2(&free_bytes, &total_bytes);
++        const tracked = cuda.usage(false);
++        std.debug.print("[dsv41-graph-diag] rank={d} family=round phase={s} capture_attempt={d} entries={d} rows={d} bucket={d} stretch={d} cuda_status={d} cuda_free={d} cuda_total={d} tracked_device={d} tracked_host={d} tracked_peak={d}\n", .{
++            e.comm.rank, phase, g.capture_attempts, g.map.count(), key.rows, key.bucket, key.stretch,
++            status, free_bytes, total_bytes, tracked.device, tracked.host, tracked.peak,
++        });
+     }
+ 
+     fn run(g: *Graphs, key: Key, e: *const Engine, rd: *Round, ch: *const Chunk, cs: *const Caches, rings: []const u64, cy: *Carry, li: usize, end: usize) !void {
+@@ -874,6 +890,8 @@
+             return;
+         }
+         const start = cy.*;
++        if (g.diag_enabled) g.capture_attempts += 1;
++        g.diagnostic(key, e, "before_capture");
+         try cuda.graph.beginCapture(e.s, .thread_local);
+         stretch(e, rd, ch, cs, rings, cy, li, end, null) catch |err| {
+             if (cuda.graph.endCapture(e.s)) |got| {
+@@ -883,11 +901,16 @@
+             return err;
+         };
+         var graph = try cuda.graph.endCapture(e.s);
+-        defer graph.deinit();
++        defer {
++            graph.deinit();
++            g.diagnostic(key, e, "after_graph_destroy");
++        }
+         var exec = try graph.instantiate();
+         errdefer exec.deinit();
++        g.diagnostic(key, e, "after_instantiate");
+         try g.map.put(g.gpa, key, .{ .exec = exec, .start = start, .end = cy.* });
+         try exec.launchOn(e.s);
++        g.diagnostic(key, e, "after_first_launch");
+     }
+ };
+ 
+--- a/zig/src/families/dsv41/draft.zig
++++ b/zig/src/families/dsv41/draft.zig
+@@ -114,12 +114,15 @@
+ /// buffer and every per-pass value (ids, positions, slots, the pick lists) is uploaded ahead of the replay.
+ pub const PassGraphs = struct {
+     gpa: std.mem.Allocator,
++    diag_enabled: bool = false,
++    capture_attempts: u64 = 0,
+     map: std.AutoHashMapUnmanaged(Key, cuda.graph.Exec) = .empty,
+ 
+     pub const Key = struct { streams: u32, steps: u32 };
+ 
+     pub fn init(gpa: std.mem.Allocator) PassGraphs {
+-        return .{ .gpa = gpa };
++        const enabled = if (std.c.getenv("TF_DS_GRAPH_DIAG")) |v| std.mem.eql(u8, std.mem.span(v), "1") else false;
++        return .{ .gpa = gpa, .diag_enabled = enabled };
+     }
+ 
+     pub fn deinit(g: *PassGraphs) void {
+@@ -133,9 +136,24 @@
+         return g.map.count();
+     }
+ 
++    // Driver-owned graph memory is outside cuda.usage(); sample both without synchronizing.
++    fn diagnostic(g: *const PassGraphs, key: Key, e: *const Engine, phase: []const u8) void {
++        if (!g.diag_enabled) return;
++        var free_bytes: usize = 0;
++        var total_bytes: usize = 0;
++        const status = e.d.api.cuMemGetInfo_v2(&free_bytes, &total_bytes);
++        const tracked = cuda.usage(false);
++        std.debug.print("[dsv41-graph-diag] rank={d} family=draft phase={s} capture_attempt={d} entries={d} streams={d} steps={d} cuda_status={d} cuda_free={d} cuda_total={d} tracked_device={d} tracked_host={d} tracked_peak={d}\n", .{
++            e.comm.rank, phase, g.capture_attempts, g.map.count(), key.streams, key.steps,
++            status, free_bytes, total_bytes, tracked.device, tracked.host, tracked.peak,
++        });
++    }
++
+     fn run(g: *PassGraphs, dr: *Drafter, e: *const Engine, ch: *const Chunk, pool: *const Pool, N: usize, steps: usize) !void {
+         const key: Key = .{ .streams = @intCast(N), .steps = @intCast(steps) };
+         if (g.map.getPtr(key)) |x| return x.launchOn(e.s);
++        if (g.diag_enabled) g.capture_attempts += 1;
++        g.diagnostic(key, e, "before_capture");
+         try cuda.graph.beginCapture(e.s, .thread_local);
+         dr.body(e, ch, pool, N, steps, null) catch |err| {
+             if (cuda.graph.endCapture(e.s)) |got| {
+@@ -145,11 +163,16 @@
+             return err;
+         };
+         var graph = try cuda.graph.endCapture(e.s);
+-        defer graph.deinit();
++        defer {
++            graph.deinit();
++            g.diagnostic(key, e, "after_graph_destroy");
++        }
+         var exec = try graph.instantiate();
+         errdefer exec.deinit();
++        g.diagnostic(key, e, "after_instantiate");
+         try g.map.put(g.gpa, key, exec);
+         try exec.launchOn(e.s);
++        g.diagnostic(key, e, "after_first_launch");
+     }
+ };
+ 
