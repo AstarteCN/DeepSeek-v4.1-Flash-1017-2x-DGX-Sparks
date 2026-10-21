@@ -1,0 +1,6 @@
+{
+  "tokenizer.json": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+  "tokenizer_config.json": "6ac8c8dc065ed118161d02dd532749ae3f52c243deac27872134fae2f50d8547",
+  "config.json": "4eac47f0da99a65f2bcfb97ca357f7d5388a79c9b377d6dd65b1ed18548d846d",
+  "chat_template.jinja": "2ad469968493ff62065c26f49a6b12e5f6968ef51f6321bc5a7361c21c3cc477"
+}
