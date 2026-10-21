@@ -1,0 +1,25 @@
+--- a/zig/src/families/dsv41/vision.zig
++++ b/zig/src/families/dsv41/vision.zig
+@@ -69,7 +69,22 @@
+ 
+     pub const placeholder = "<\u{ff5c}deepseek_image\u{ff5c}>";
+ 
++    // Decode/resize buffers live for one image, independently of the HTTP request arena.
++    // Both successful payloads and BadImage messages must outlive this scratch arena.
+     fn prepareFn(ctx: *anyopaque, a: std.mem.Allocator, bytes: []const u8, problem: *[]const u8) lanes.stream.Vision.PrepareError!lanes.stream.Vision.Prepared {
++        var scratch: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
++        defer scratch.deinit();
++        var scratch_problem: []const u8 = "";
++        const prepared = prepareScratch(ctx, scratch.allocator(), bytes, &scratch_problem) catch |err| {
++            if (err == error.BadImage) problem.* = try a.dupe(u8, scratch_problem);
++            return err;
++        };
++        const payload = try a.alignedAlloc(u8, .@"16", prepared.payload.len);
++        @memcpy(payload, prepared.payload);
++        return .{ .tokens = prepared.tokens, .payload = payload };
++    }
++
++    fn prepareScratch(ctx: *anyopaque, a: std.mem.Allocator, bytes: []const u8, problem: *[]const u8) lanes.stream.Vision.PrepareError!lanes.stream.Vision.Prepared {
+         const v: *Vision = @ptrCast(@alignCast(ctx));
+         var rgb = try v.decode(a, bytes, problem);
+         defer rgb.deinit(a);
