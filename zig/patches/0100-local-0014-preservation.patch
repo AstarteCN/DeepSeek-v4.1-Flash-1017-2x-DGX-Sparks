@@ -1,0 +1,135 @@
+# Local 0014 base preservation after upstream PR30/PR40. Apache-2.0.
+# Preserves request-owned HF results, immutable list-prefix reuse (0012),
+# and per-image scratch release (0014); no local toolmerge/namespace experiment.
+--- a/zig/src/server/hf_text.zig
++++ b/zig/src/server/hf_text.zig
+@@ -216,8 +216,12 @@
+ 
+     fn encodeFn(ctx: *anyopaque, a: Allocator, s: []const u8, add_special: bool) model_text.Error![]u32 {
+         const t = self(ctx);
+-        const ids = t.tok.encode(a, s) catch |e| return if (e == error.OutOfMemory) error.OutOfMemory else error.Template;
+-        if (!add_special or (t.prefix.len == 0 and t.suffix.len == 0)) return ids;
++        // Scratch must not be backed by the caller's request arena: freeing a
++        // nested arena after copying its result cannot reclaim those old blocks.
++        var scratch: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
++        defer scratch.deinit();
++        const ids = t.tok.encode(scratch.allocator(), s) catch |e| return if (e == error.OutOfMemory) error.OutOfMemory else error.Template;
++        if (!add_special or (t.prefix.len == 0 and t.suffix.len == 0)) return a.dupe(u32, ids);
+         return std.mem.concat(a, u32, &.{ t.prefix, ids, t.suffix });
+     }
+ 
+@@ -253,24 +257,29 @@
+             problem.* = "this checkpoint has no chat template: send a completion prompt instead";
+             return error.Template;
+         };
++        // One render owns its temporary context, converted messages and nested
++        // template arena. Only the final text escapes into the caller's allocator.
++        var scratch: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
++        defer scratch.deinit();
++        const temporary = scratch.allocator();
+         var context: std.json.ObjectMap = .empty;
+         if (t.specials == .object) {
+             var it = t.specials.object.iterator();
+-            while (it.next()) |e| try context.put(a, e.key_ptr.*, e.value_ptr.*);
+-        }
+-        try context.put(a, "enable_thinking", .{ .bool = options.enable_thinking });
+-        try context.put(a, "thinking_mode", .{ .string = if (options.enable_thinking) "thinking" else "chat" });
++            while (it.next()) |e| try context.put(temporary, e.key_ptr.*, e.value_ptr.*);
++        }
++        try context.put(temporary, "enable_thinking", .{ .bool = options.enable_thinking });
++        try context.put(temporary, "thinking_mode", .{ .string = if (options.enable_thinking) "thinking" else "chat" });
+         if (options.reasoning_effort_value) |v| {
+-            try context.put(a, "reasoning_effort", .{ .integer = v });
+-        } else if (options.reasoning_effort) |e| try context.put(a, "reasoning_effort", .{ .string = e });
++            try context.put(temporary, "reasoning_effort", .{ .integer = v });
++        } else if (options.reasoning_effort) |e| try context.put(temporary, "reasoning_effort", .{ .string = e });
+         var diag: template.Diag = .{};
+-        const tools: std.json.Value = if (options.tools) |tl| try toStd(a, tl) else .null;
+-        const out = template.render(a, compiled, try toStd(a, messages), tools, .{ .object = context }, options.add_generation_prompt, &diag) catch |e| {
++        const tools: std.json.Value = if (options.tools) |tl| try toStd(temporary, tl) else .null;
++        const out = template.render(temporary, compiled, try toStd(temporary, messages), tools, .{ .object = context }, options.add_generation_prompt, &diag) catch |e| {
+             if (e == error.OutOfMemory) return error.OutOfMemory;
+-            problem.* = diag.msg;
++            problem.* = try a.dupe(u8, diag.msg);
+             return error.Template;
+         };
+-        return out;
++        return a.dupe(u8, out);
+     }
+ };
+ 
+--- a/zig/src/core/template/eval.zig
++++ b/zig/src/core/template/eval.zig
+@@ -25,6 +25,7 @@
+     out: *std.ArrayList(u8),
+     depth: usize = 0,
+     acc: std.ArrayList(u8) = .empty,
++    list_acc: std.ArrayList(Value) = .empty,
+ 
+     fn resolve(c: *Ctx, name: []const u8) Error!Value {
+         if (c.vars.get(name)) |x| return x;
+@@ -50,6 +51,30 @@
+     }
+     c.acc.appendSliceAssumeCapacity(r);
+     return c.acc.items;
++}
++
++// A concat result is immutable, but its unused tail can be appended to without
++// changing any previously published prefix slice. Branches and growth always
++// allocate another buffer; the render arena keeps old aliases alive.
++const list_acc_min = 128;
++
++fn isListAcc(c: *const Ctx, items: []const Value) bool {
++    return items.len > 0 and items.ptr == c.list_acc.items.ptr and items.len == c.list_acc.items.len;
++}
++
++fn joinList(c: *Ctx, l: []const Value, r: []const Value) Error![]const Value {
++    const a = c.rt.a;
++    if (l.len < list_acc_min and !isListAcc(c, l)) return std.mem.concat(a, Value, &.{ l, r });
++    const needed = std.math.add(usize, l.len, r.len) catch return error.OutOfMemory;
++    const fresh = !isListAcc(c, l);
++    if (fresh or needed > c.list_acc.capacity) {
++        const capacity = if (fresh) needed else std.math.mul(usize, needed, 2) catch needed;
++        var grown: std.ArrayList(Value) = try .initCapacity(a, capacity);
++        grown.appendSliceAssumeCapacity(l);
++        c.list_acc = grown;
++    }
++    c.list_acc.appendSliceAssumeCapacity(r);
++    return c.list_acc.items;
+ }
+ 
+ const Flow = enum { normal, brk, cont };
+@@ -352,7 +377,7 @@
+         return .{ .str = .{ .s = try join(c, ls, rs), .safe = safe } };
+     }
+     if (op == .add and l == .list and r == .list and l.list.seq == r.list.seq and (l.list.seq == .list or l.list.seq == .tuple))
+-        return rt.list(try std.mem.concat(rt.a, Value, &.{ l.list.items, r.list.items }), l.list.seq);
++        return rt.list(try joinList(c, l.list.items, r.list.items), l.list.seq);
+     if (op == .mul and (l == .str or l == .list or r == .str or r == .list) and (isNum(l) or isNum(r)) and l != .float and r != .float) {
+         const seq = if (isNum(l)) r else l;
+         const n = @max(0, intOf(if (isNum(l)) l else r));
+--- a/zig/src/families/dsv41/vision.zig
++++ b/zig/src/families/dsv41/vision.zig
+@@ -69,7 +69,22 @@
+ 
+     pub const placeholder = "<\u{ff5c}deepseek_image\u{ff5c}>";
+ 
++    // Decode/resize buffers live for one image, independently of the HTTP request arena.
++    // Both successful payloads and BadImage messages must outlive this scratch arena.
+     fn prepareFn(ctx: *anyopaque, a: std.mem.Allocator, bytes: []const u8, problem: *[]const u8) lanes.stream.Vision.PrepareError!lanes.stream.Vision.Prepared {
++        var scratch: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
++        defer scratch.deinit();
++        var scratch_problem: []const u8 = "";
++        const prepared = prepareScratch(ctx, scratch.allocator(), bytes, &scratch_problem) catch |err| {
++            if (err == error.BadImage) problem.* = try a.dupe(u8, scratch_problem);
++            return err;
++        };
++        const payload = try a.alignedAlloc(u8, .@"16", prepared.payload.len);
++        @memcpy(payload, prepared.payload);
++        return .{ .tokens = prepared.tokens, .payload = payload };
++    }
++
++    fn prepareScratch(ctx: *anyopaque, a: std.mem.Allocator, bytes: []const u8, problem: *[]const u8) lanes.stream.Vision.PrepareError!lanes.stream.Vision.Prepared {
+         const v: *Vision = @ptrCast(@alignCast(ctx));
+         var rgb = try v.decode(a, bytes, problem);
+         defer rgb.deinit(a);

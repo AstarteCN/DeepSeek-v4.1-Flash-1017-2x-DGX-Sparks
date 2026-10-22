@@ -1,0 +1,166 @@
+{
+  "base_0014": "14d87694fe62982889e634363bccc704f94f13b6",
+  "pr30": "e7dd2e32bfd7d77be305731007ed76a8b43186f5",
+  "pr40": "bd3f7fc9da1086b232c99977e5ba276e9ed1b4f7",
+  "engine": "629c524a0ea57512a5342abb498d1b7c25353343",
+  "patches": [
+    {
+      "file": "0001-c7-indexer-split.patch",
+      "sha256": "195770e60eddf1eed3020e3f4257c48768569f2676277f4f71f25a3ef44b5e7e"
+    },
+    {
+      "file": "0002-c3-engram-lanes.patch",
+      "sha256": "bb154554020c45e54ad3c83f03a89320f460bdbe562eb7a417d8a4a91141d456"
+    },
+    {
+      "file": "0004-call-gate.patch",
+      "sha256": "285a2b02e8018ecea32a4920b2e2186f4e382ab6340036cc6deaf492a1920fd6"
+    },
+    {
+      "file": "0005-prefill-interleave.patch",
+      "sha256": "941adac2471a64c47d6e8c45d82487be3064f0f40804d2ec4b530db591c8a017"
+    },
+    {
+      "file": "0006-image-prompt-cache.patch",
+      "sha256": "971335ae5869271d34329421e6f6ec3b9903cabaee53e8b14a09c9dd8d2dcd2e"
+    },
+    {
+      "file": "0008-pool-window.patch",
+      "sha256": "44ac9c7c17d3f549a891c435e715fffe655d27827631137b6419ae965f9381ed"
+    },
+    {
+      "file": "0010-rdma-idle-nap.patch",
+      "sha256": "5921662bc27c4f87a3f30587d57da11391d710eb4eaa92e25e05a3c5f74b72f8"
+    },
+    {
+      "file": "0011-cuda-budget-parked-pages.patch",
+      "sha256": "4272f03ac977ebcb57e8a72277a8cc472f6a91dadb9fc228d0ef6d05392a3a90"
+    },
+    {
+      "file": "0012-dsv41-base-fixes.patch",
+      "sha256": "2f8cc579185fbc450f7de3298ad614da09c18415882e7c7b554e347d314cc539"
+    },
+    {
+      "file": "0013-core-spill-store.patch",
+      "sha256": "b915a37bf4ac4435b78a069772631bfb352af912375cb4f1faf3a02b8f25476f"
+    },
+    {
+      "file": "0014-core-cache-tier.patch",
+      "sha256": "43211c8e2891b25f60349dcf67b99cb7e9dd0f2cdef5094f519f3f39ad6d0001"
+    },
+    {
+      "file": "0015-dsv41-kv-shard-attn.patch",
+      "sha256": "b044a612c49ebf1be84b7f47d622e3c5a24c8738f9d93ec3ba7fb17e81e1958f"
+    },
+    {
+      "file": "0016-dsv41-spill-blocks.patch",
+      "sha256": "66c580fc462abaa02a79c93c184533d8f954d18b7e9f992e5fdc8ffa8682bef7"
+    },
+    {
+      "file": "0017-dsv41-kit-row-split.patch",
+      "sha256": "b64f5bf8a4f00be995cd75ef113c230f23f316bdb7734a8e4af6b930eff0333e"
+    },
+    {
+      "file": "0018-dsv41-kv-shard-lanes.patch",
+      "sha256": "06e64d48fa87ce51702b6bab570cf505a0a51495a05fde32a8c3f453fc43fa0c"
+    },
+    {
+      "file": "0019-dsv41-spill-kv-shard.patch",
+      "sha256": "39d8e9da491f7fbfe95a1ef401154b128a8b9a0d2438540753e13b1856ea2ebb"
+    },
+    {
+      "file": "0020-dsv41-pair-broken.patch",
+      "sha256": "be08afa729fa29f069daecf78f2ef7e95228ba9c005e734e854f2182a8d6c577"
+    },
+    {
+      "file": "0021-dsv41-spill-pictures.patch",
+      "sha256": "163da9b36a5da171a5971d96b51ff23172867dbe913dba8f3289154e909a2605"
+    },
+    {
+      "file": "0022-dsv41-kv-shard-ring.patch",
+      "sha256": "fd55049a3340d2022fe6b5e3d0303e876526c8b7471545f2dd2c105537f293c4"
+    },
+    {
+      "file": "0023-server-prepare-memory.patch",
+      "sha256": "2a594193310eb1a133a38597fbfac8029190a07dbb2111103558f2175b6a97ca"
+    },
+    {
+      "file": "0100-local-0014-preservation.patch",
+      "sha256": "9c08016262c4a4d0cfe018c5fd7d019b0c5ab913ff9d1c567073b0bd576478e8"
+    }
+  ],
+  "prepare_dedup": {
+    "pr30_patch_sha256": "2a594193310eb1a133a38597fbfac8029190a07dbb2111103558f2175b6a97ca",
+    "pr40_patch_sha256": "553efef99626dee60e7721a4ee439208b93bccc9dc20aee52510539fe88d003b",
+    "added_removed_lines_equal": true,
+    "delta_line_count": 581
+  },
+  "local_preservation": {
+    "files": {
+      "zig/src/server/hf_text.zig": "c3d5a1c288ea56546ff23a3d2d6bdc7604f06f7bfbe4423720ae234f50c887bf",
+      "zig/src/core/template/eval.zig": "0151fd73821d69a6d6f004f55da386d1d5a324f7bd17a2ee335fbbe6e68ef2ce",
+      "zig/src/families/dsv41/vision.zig": "e36dfa4c9422b1f0639b6a88d39e996299699ebe3cc2dbe5e5e267f0aa2e7ae1"
+    },
+    "patch_sha256": "9c08016262c4a4d0cfe018c5fd7d019b0c5ab913ff9d1c567073b0bd576478e8",
+    "image_original_body_preserved": true,
+    "hf_request_ownership_preserved": true,
+    "local_list_prefix_preserved": true,
+    "local_toolmerge_excluded": true,
+    "diagnostic_only_patches": "exact bytes archived, disabled production diagnostics not carried into active engine"
+  },
+  "target": {
+    "POOL": 5218304,
+    "PARALLEL": 4,
+    "CONTEXT": 1048576,
+    "KV_SHARD": 1,
+    "ROUND_ROWS": 16
+  },
+  "windows_omitted_goldens": [
+    {
+      "path": "zig/tests/server/golden/status/get-health?reset_peak=1.json",
+      "blob": "496314c7b61d8ac5bf51ab631c5b6a0830b86b08",
+      "sha256": "452479e41e49476999259d368b27cae526a53b751e7632ff7a29f5d4ce8c0774"
+    },
+    {
+      "path": "zig/tests/server/golden/status/get-v1-models?x=1.json",
+      "blob": "569c61383dac58bc7e5d03c23cf8df49e8047c5d",
+      "sha256": "3fffab7014c2b643c0bfce9a3bb6a51f324495495b83cc67a6f6515b04ce7585"
+    },
+    {
+      "path": "zig/tests/server/golden/tools/choice-\"auto\".json",
+      "blob": "bf591ee0e8ad9d5521fa493f1ec612cb75ed6b38",
+      "sha256": "b6b5e385ddcd5de090cf5442c94904d1aaa91fccf1a821c25d7917750ad87f50"
+    },
+    {
+      "path": "zig/tests/server/golden/tools/choice-\"none\".json",
+      "blob": "bf1ed997b6195a3b797b2c9f9b0550b98129d89e",
+      "sha256": "285e41dd145a521f927c2172ad6346f3ef7ddffdd70890d0be5d44b18e5b9ee0"
+    },
+    {
+      "path": "zig/tests/server/golden/tools/choice-\"required\".json",
+      "blob": "bf591ee0e8ad9d5521fa493f1ec612cb75ed6b38",
+      "sha256": "b6b5e385ddcd5de090cf5442c94904d1aaa91fccf1a821c25d7917750ad87f50"
+    },
+    {
+      "path": "zig/tests/server/golden/tools/choice-{\"type\": \"function\", \"function\": {\"name\": \"lookup\"}}.json",
+      "blob": "bf591ee0e8ad9d5521fa493f1ec612cb75ed6b38",
+      "sha256": "b6b5e385ddcd5de090cf5442c94904d1aaa91fccf1a821c25d7917750ad87f50"
+    },
+    {
+      "path": "zig/tests/server/golden/tools/choice-{\"type\": \"function\", \"function\": {\"name\": \"nope\"}}.json",
+      "blob": "b78b79feff2302f19453f073a23df5d692043902",
+      "sha256": "77cd024db03b596622fe7b0b247ea68f6f324e3cf7b099e59605e2255c1d17d3"
+    },
+    {
+      "path": "zig/tests/server/golden/tools/choice-{\"type\": \"function\"}.json",
+      "blob": "8499e8e8a7c0e534d710f31c8527efb4fa1d2143",
+      "sha256": "c5b5eb7d0da115e61bef470de9b341032b4e162af449daa66662361b66af81c5"
+    }
+  ],
+  "gpu_validation": "not_run",
+  "production_changed": false,
+  "test_source_normalization": {
+    "compared_zig_sources": 442,
+    "result": "identical after CRLF-to-LF normalization; production replay forces core.autocrlf=false"
+  }
+}

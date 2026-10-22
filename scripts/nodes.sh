@@ -89,6 +89,24 @@ ensure_nfs_volume() {
   fi
 }
 worker_nfs() { local i=$1; shift; worker "$i" "docker run --rm --entrypoint '$1' -v '$NFS_VOLUME:/hf:ro' '$IMAGE' $(printf '%q ' "${@:2}")"; }
+# Check the worker's actual file view, not just a successful mount or a prepared marker.
+# Also works with the documented PREPARE=0 / host-path NFS_VOLUME setup: do not create a volume here.
+worker_files_check() {
+  local i=$1 out
+  if out=$(worker_nfs "$i" sh -ec '
+    for f in "$@"; do
+      if [ ! -f "$f" ] || [ ! -r "$f" ] || [ ! -s "$f" ]; then
+        echo "Missing, empty or unreadable on worker: $f" >&2
+        exit 1
+      fi
+    done
+  ' sh "$(model_in_container)/config.json" "/hf/$KIT_SUB/kit/MANIFEST" "/hf/$DATA_SUB/dsv41_token_map.json" 2>&1); then
+    return 0
+  fi
+  printf '%s\n' "$out" >&2
+  die "$(worker_host "$i") cannot read the model/kit through $NFS_VOLUME (NFS :$NFS_PATH from $(nfs_server "$i")). Check the actual NFSv4 root, stale file handles and competing host/container NFS servers (README: NFS); for a host-path mount check that worker's local files. No ranks were launched by this check"
+}
+
 # link_info <peer address>: this node's side of the link to <peer>: "<address> <netdev> <rdma device> <gid index>".
 # The netdev and source address come from the route to the peer; the RDMA device from sysfs; the GID index is the
 # RoCE v2 entry that holds this node's IPv4 address (an all-zero or v1 entry makes NCCL fail about a minute in).
@@ -321,7 +339,42 @@ head_hf_mount() {
 }
 
 # mem_available_gib: MemAvailable here, in GiB (one decimal)
-mem_available_gib() { awk '/^MemAvailable:/ {printf "%.1f", $2 / 1048576}' /proc/meminfo; }
+# mem_available_gib: what start.sh's MIN_AVAIL_GIB check counts here, MemAvailable plus the pages parked on the per-CPU
+# free lists (mem_counting below; plain MemAvailable if /proc/zoneinfo cannot be read)
+mem_available_gib() { local m; m=$(mem_counting 2>/dev/null) && echo "${m%% *}" || awk '/^MemAvailable:/ {printf "%.1f", $2 / 1048576}' /proc/meminfo; }
+# mem_counting: MemAvailable plus the pages parked on the per-CPU free lists, as the engine's startup budget counts it
+# (scripts/memavail.sh; start.sh's MIN_AVAIL_GIB check)
+source "${_cfg_root:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/scripts/memavail.sh"
+
+# The port's pair-restart guard (scripts/pairwatch.sh), rank 0 only: it restarts both ranks when rank 0's engine
+# exits with status 75, its broken-pair policy (TF_DS_PAIR_BROKEN=exit, the engine's default with the spill tier or KV
+# sharding on). Off with both features off, with TF_DS_PAIR_BROKEN=degrade, with PAIR_RESTART=0, and with FOREGROUND=1
+# (a supervisor restarts on the exit code then). The arm file is what stop.sh takes away first (pairwatch_disarm).
+pair_restart_on() {
+  [[ "$PAIR_RESTART" == 1 && "${FOREGROUND:-0}" != 1 ]] || return 1
+  case "$(printenv TF_DS_PAIR_BROKEN 2>/dev/null)" in      # what reaches the engine (start.sh passes exported TF_DS_*)
+    degrade) return 1 ;;
+    exit) return 0 ;;
+  esac
+  port_spill_on || [[ "$KV_SHARD" == 1 ]]
+}
+pairwatch_disarm() { rm -f "$STATE_DIR/pairwatch.arm"; }
+pairwatch_start() {
+  if ! pair_restart_on; then pairwatch_stop; return 0; fi
+  mkdir -p "$STATE_DIR" && : > "$STATE_DIR/pairwatch.arm" || die "could not arm the pair-restart guard ($STATE_DIR)"
+  local i ws=""
+  for i in $(configured_workers); do ws+="$i=$(worker_host "$i") "; done
+  # (the guard saves both ranks' logs into LOG_DIR before a restart: LOG_KEEP of each, the worker's over ssh)
+  PAIRWATCH_SAVE_KEEP="$LOG_KEEP" PAIRWATCH_WORKERS="$ws" \
+  "$_cfg_root/scripts/pairwatch.sh" start "$CONTAINER_NAME" "$_cfg_root" "$LOG_DIR/pairwatch.log" "$STATE_DIR/pairwatch.pid" \
+    "$STATE_DIR/pairwatch.arm" "$PAIR_RESTART_MAX" ${PAIR_RESTART_HOLD:+"$PAIR_RESTART_HOLD"} ||
+    die "the pair-restart guard did not start here"
+  log "Pair restart on: rank 0 exiting with status 75 (the rank pair broke) restarts both ranks within ${PAIRWATCH_POLL_S:-2} s, at most $PAIR_RESTART_MAX times an hour (log: pairwatch.log)"
+}
+pairwatch_stop() {
+  pairwatch_disarm
+  "$_cfg_root/scripts/pairwatch.sh" stop "$STATE_DIR/pairwatch.pid" 2>/dev/null || true
+}
 
 # await_memory: sets HERE_GB and WORKER_GB (GiB) to the memory available on this Spark and on worker 1, once both reach
 # MIN_AVAIL_GIB or after MIN_AVAIL_WAIT_S seconds at the latest (returns 1 then; the caller words the refusal). A build or a large
@@ -331,7 +384,7 @@ await_memory() {
   local waited=0
   while :; do
     HERE_GB=$(mem_available_gib)
-    WORKER_GB=$(worker 1 "awk '/^MemAvailable:/ {printf \"%.1f\", \$2 / 1048576}' /proc/meminfo" 2>/dev/null || echo 0)
+    WORKER_GB=$(worker 1 "$(declare -f mem_counting mem_available_gib); mem_available_gib" 2>/dev/null || echo 0)
     awk -v a="$HERE_GB" -v b="$WORKER_GB" -v m="$MIN_AVAIL_GIB" 'BEGIN {exit !(a >= m && b >= m)}' && return 0
     (( waited < MIN_AVAIL_WAIT_S )) || return 1
     sleep 2
@@ -342,6 +395,7 @@ await_memory() {
 # The memory guard (scripts/memguard.sh) on this Spark and on the worker, which gets a copy of the script.
 MEMGUARD_REMOTE_DIR='$HOME/.cache/dsv41-tensorfold'
 memguard_start() {
+  pairwatch_start      # the port's pair-restart guard rides along (it needs no memory floor, so before that check)
   awk -v g="$MEMGUARD_GIB" 'BEGIN {exit !(g > 0)}' || return 0
   "$_cfg_root/scripts/memguard.sh" start "$CONTAINER_NAME" "$MEMGUARD_GIB" "$LOG_DIR/memguard.log" "$STATE_DIR/memguard.pid" "$MEMGUARD_HOLD_S" "$MEMGUARD_HARD_GIB" ||
     die "the memory guard did not start here"
@@ -356,6 +410,7 @@ memguard_start() {
 }
 memguard_stop() {
   local i
+  pairwatch_stop
   "$_cfg_root/scripts/memguard.sh" stop "$STATE_DIR/memguard.pid" 2>/dev/null || true
   for i in $(configured_workers); do
     worker "$i" "[ -x $MEMGUARD_REMOTE_DIR/memguard.sh ] && $MEMGUARD_REMOTE_DIR/memguard.sh stop $MEMGUARD_REMOTE_DIR/memguard.pid; true" 2>/dev/null || true
