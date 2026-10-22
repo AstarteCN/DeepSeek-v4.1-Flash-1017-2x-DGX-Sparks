@@ -6,7 +6,27 @@
 # Usage: scripts/port_test.sh      (exits 1 on the first failed check)
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
-fails=0; n=0
+fails=0; n=0; platform_skips=0
+native_linux=0; [[ "$(uname -s)" != Linux ]] || native_linux=1
+symlink_ok=0
+probe_dir=$(mktemp -d "${TMPDIR:-/tmp}/port-symlink.XXXXXX")
+printf x > "$probe_dir/target"
+if ln -s "$probe_dir/target" "$probe_dir/link" 2>/dev/null && [[ -L "$probe_dir/link" ]]; then symlink_ok=1; fi
+rm -f -- "$probe_dir/link" "$probe_dir/target"; rmdir "$probe_dir"
+if [[ "${PORT_TEST_REQUIRE_LINUX:-0}" == 1 ]] && { (( ! native_linux || ! symlink_ok )) || [[ ! -r /proc/meminfo || ! -r /proc/zoneinfo ]]; }; then
+  echo "FAIL prerequisite: native Linux /proc and real POSIX symlinks required; do not waive for deployment" >&2
+  exit 2
+fi
+platform_skip() {
+  local name=$1 reason=
+  case "$name" in
+    "parked pages: this host's /proc/meminfo and /proc/zoneinfo") (( native_linux )) || reason="native Linux /proc required" ;;
+    "weights digest: none or two files, or a link, is an error"|"pairwatch: the log is rotated at its cap, keeping PAIRWATCH_LOG_KEEP copies; the history keeps only the last hour"|"spill ownership: only a canonical, marked folder of your own is handed back, by a minimal container")
+      (( symlink_ok )) || reason="real POSIX symlinks required (MSYS emulation is not sufficient)" ;;
+  esac
+  [[ -n "$reason" ]] || return 1
+  platform_skips=$((platform_skips + 1)); printf 'SKIP %s: %s; mandatory on Linux before deployment\n' "$name" "$reason"
+}
 # PT_FORK=1 in a case's first script: port.sh with a fork's defaults on (PORT_SPILL_DEFAULT_GIB=64, PORT_SHARD_DEFAULT=1),
 # the configuration the degrade paths exist for
 fork_sh=$(mktemp "${TMPDIR:-/tmp}/port-fork.XXXXXX")
@@ -18,6 +38,7 @@ sed -e 's/^PORT_SPILL_DEFAULT_GIB=[0-9.]*/PORT_SPILL_DEFAULT_GIB=64/' -e 's/^POR
 # settings of a two-Spark default (CONTEXT 1048576, PARALLEL 8, 16-row rounds), die/warn/log stubbed
 case_() {
   local name=$1 want=$2 got out
+  platform_skip "$name" && return 0
   shift 2
   n=$((n + 1))
   out=$( (
@@ -434,6 +455,7 @@ case_ "pair restart: on with the spill tier" 0 "SPILL_GIB=8 PAIR_RESTART=1" "
 # check_ <name> <script>: the script in a subshell; exit 0 passes
 check_() {
   local name=$1 out got
+  platform_skip "$name" && return 0
   n=$((n + 1))
   out=$( ( eval "$2" ) 2>&1 ); got=$?
   if [[ "$got" == 0 ]]; then printf 'ok   %s\n' "$name"
@@ -728,5 +750,5 @@ EOF
 fi
 
 rm -rf -- "$mt"
-echo "$((n - fails)) of $n checks passed"
+echo "$((n - fails)) of $n checks passed; $platform_skips mandatory-Linux checks skipped"
 (( fails == 0 ))

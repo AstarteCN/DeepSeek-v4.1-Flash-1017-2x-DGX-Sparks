@@ -8,6 +8,9 @@ check that cannot fail is caught too. Exit 1 when any expectation is not met. Lo
 (kept with --keep, or on a failure).
 """
 import argparse
+import hashlib
+import re
+import shlex
 import os
 import py_compile
 import shutil
@@ -24,6 +27,21 @@ ROOT = os.path.dirname(HERE)
 PY = sys.executable or "python3"
 FAST = ["--prefill-us-per-token", "3", "--decode-ms-per-token", "1"]
 results = []
+
+
+def log_filename(label):
+    # Colons are NTFS streams; punctuation and long labels are not portable filenames.
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "_", label)[:64]
+    return stem + "-" + hashlib.sha256(label.encode("utf-8")).hexdigest()[:8] + ".log"
+
+
+def shell_command(args):
+    # pair_check/spill_check deliberately execute shell commands; quote for that shell.
+    return subprocess.list2cmdline(args) if os.name == "nt" else shlex.join(args)
+
+
+def python_shell(*args):
+    return shell_command([PY, "-X", "utf8", *args])
 
 
 def free_port():
@@ -43,7 +61,7 @@ class Fake:
 
     def start(self, *extra):
         self.log = open(os.path.join(self.work, f"fake-{self.name}.log"), "a")
-        self.p = subprocess.Popen([PY, "-I", os.path.join(HERE, "fake_server.py"), "--port", str(self.port)]
+        self.p = subprocess.Popen([PY, "-X", "utf8", "-I", os.path.join(HERE, "fake_server.py"), "--port", str(self.port)]
                                   + self.args + list(extra), stdout=self.log, stderr=subprocess.STDOUT)
         end = time.monotonic() + 20
         while time.monotonic() < end:
@@ -67,9 +85,9 @@ class Fake:
 
 def run(work, label, args, expect_ok=True, env=None):
     """Run a tool; it must exit 0 (expect_ok) or non-zero (a planted fault caught)."""
-    log = os.path.join(work, label.replace(" ", "_").replace("/", "_") + ".log")
+    log = os.path.join(work, log_filename(label))
     t0 = time.monotonic()
-    with open(log, "w") as f:
+    with open(log, "w", encoding="utf-8") as f:
         p = subprocess.run(args, stdout=f, stderr=subprocess.STDOUT, env=dict(os.environ, **(env or {})),
                            timeout=900)
     ok = (p.returncode == 0) == expect_ok
@@ -77,13 +95,13 @@ def run(work, label, args, expect_ok=True, env=None):
     print(f"{'PASS' if ok else 'FAIL'}  {label}: exit {p.returncode} (expected {'0' if expect_ok else 'non-zero'}), "
           f"{time.monotonic() - t0:.1f}s, log {log}", flush=True)
     if not ok:
-        with open(log) as f:
+        with open(log, encoding="utf-8", errors="replace") as f:
             print("      " + "      ".join(f.readlines()[-15:]), flush=True)
     return ok
 
 
 def tool(name):
-    return [PY, "-I", os.path.join(HERE, name)]
+    return [PY, "-X", "utf8", "-I", os.path.join(HERE, name)]
 
 
 def t_exact(work):
@@ -97,7 +115,7 @@ def t_exact(work):
         g = subprocess.run(["git", "-C", ROOT, "show", "e65785c:tools/exact.py"], capture_output=True, text=True)
         if g.returncode == 0:
             open(old, "w").write(g.stdout)
-            run(work, "exact: old 4-stream tool records", [PY, "-I", old, "record", "--url", base.url, "--out", j("x-old.json")])
+            run(work, "exact: old 4-stream tool records", [PY, "-X", "utf8", "-I", old, "record", "--url", base.url, "--out", j("x-old.json")])
             run(work, "exact: 8-stream record --like a 4-stream record", tool("exact.py") + [
                 "record", "--url", cand.url, "--out", j("x-new-like-old.json"), "--like", j("x-old.json")])
             run(work, "exact: compare 4-stream vs 8-stream record", tool("exact.py") + [
@@ -223,10 +241,10 @@ def t_spill(work):
             "run", "--url", cand.url, "--baseline", rec, "--phase", "postrestart", "--state", state, "--strict",
             "--pictures",
             "--receipt", j("r-spill-restart.json")] + dirs)
-        kill = f"{PY} -c 'import os; os.kill({cand.p.pid}, 9)'"
+        kill = python_shell("-c", f"import os; os.kill({cand.p.pid}, 9)")
         run(work, "spill: prekill (PIDs resolved first, kill -9 while K2's write is pending)", S + [
             "run", "--url", cand.url, "--baseline", rec, "--phase", "prekill", "--state", state,
-            "--resolve-cmd", "true", "--kill-cmd", kill] + dirs)
+            "--resolve-cmd", python_shell("-c", "pass"), "--kill-cmd", kill] + dirs)
         cand.restart()
         run(work, "spill: postkill (the in-flight case exercised, --strict)", S + [
             "run", "--url", cand.url, "--baseline", rec, "--phase", "postkill", "--state", state, "--strict",
@@ -297,7 +315,21 @@ def t_pair(work):
         while not stop.is_set():
             if f.p.poll() is not None:
                 open(began, "w").close()
-                time.sleep(1)
+                # Wait for the validator's real down observation, not a one-second TCP race.
+                # A broken validator never acknowledges it and this fixture never restarts.
+                end = time.monotonic() + 30
+                observed = False
+                while time.monotonic() < end and not stop.is_set():
+                    try:
+                        with open(j(log_filename("pair: a kill ends every stream, the server goes and comes back, the 75 line is logged")), encoding="utf-8") as log:
+                            observed = "PASS down:" in log.read()
+                    except FileNotFoundError:
+                        pass
+                    if observed:
+                        break
+                    time.sleep(0.05)
+                if not observed:
+                    return
                 f.log.close()
                 f.start()
                 return
@@ -308,16 +340,16 @@ def t_pair(work):
     with open(killer, "w") as fh:
         fh.write(f"import os\nopen({rlog!r}, 'w').write('tensorfold: the rank pair broke; exiting with status 75\\n')\n"
                  f"os.kill({f.p.pid}, 9)\n")
-    kill = f"{PY} {killer}"
+    kill = python_shell(killer)
     common = ["--url", f.url, "--streams", "3", "--max-tokens", "2000", "--decode-s", "0.5"]
     try:
         run(work, "pair: a kill ends every stream, the server goes and comes back, the 75 line is logged", P + common + [
-            "--kill-cmd", kill, "--began-cmd", f"test -e {began}", "--end-deadline", "15", "--began-deadline", "15",
-            "--recover-timeout", "60", "--expect-log", f"cat {rlog}::exiting with status 75",
+            "--kill-cmd", kill, "--began-cmd", python_shell("-c", "import os,sys;sys.exit(not os.path.exists(sys.argv[1]))", began), "--end-deadline", "15", "--began-deadline", "15",
+            "--recover-timeout", "60", "--expect-log", python_shell("-c", "import sys;print(open(sys.argv[1],encoding=\"utf-8\").read())", rlog) + "::exiting with status 75",
             "--receipt", j("r-pair.json")])
         stop.set()
         run(work, "pair: a pair that does not exit is caught", P + common + [
-            "--kill-cmd", "true", "--end-deadline", "3", "--began-deadline", "3", "--recover-timeout", "5"],
+            "--kill-cmd", python_shell("-c", "pass"), "--end-deadline", "3", "--began-deadline", "3", "--recover-timeout", "5"],
             expect_ok=False)
     finally:
         stop.set()
@@ -694,7 +726,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--only", default="compile,kinds,counters,exact,spill,kv,prefix,pair,runbook")
     ap.add_argument("--keep", action="store_true")
+    ap.add_argument("--require-linux", action="store_true", help="fail instead of waiving mandatory native Linux coverage")
     a = ap.parse_args()
+    if a.require_linux and sys.platform != "linux":
+        print("FAIL prerequisite: native Linux is required; no tests or services started", file=sys.stderr)
+        return 2
     work = tempfile.mkdtemp(prefix="tf-tools-selftest-")
     print(f"selftest: work folder {work}", flush=True)
     only = a.only.split(",")
@@ -711,6 +747,9 @@ def main() -> int:
               if all(ok for _, ok in results) else "FAIL  py_compile", flush=True)
     for name, fn in (("kinds", t_kinds), ("counters", t_counters), ("exact", t_exact), ("spill", t_spill), ("kv", t_kv), ("prefix", t_prefix), ("pair", t_pair), ("runbook", t_runbook)):
         if name in only:
+            if name == "runbook" and sys.platform != "linux":
+                print("SKIP  runbook: requires native Linux shell/filesystem/systemd stubs; mandatory Linux gate remains", flush=True)
+                continue
             try:
                 fn(work)
             except Exception as e:  # noqa: BLE001

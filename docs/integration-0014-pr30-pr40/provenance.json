@@ -87,6 +87,10 @@
     {
       "file": "0100-local-0014-preservation.patch",
       "sha256": "9c08016262c4a4d0cfe018c5fd7d019b0c5ab913ff9d1c567073b0bd576478e8"
+    },
+    {
+      "file": "0101-planner-mutation-probe.patch",
+      "sha256": "28d648c2a141c7c50b40f085e570cefb152c0c08dbbb861a198b4f3ad11cc8e7"
     }
   ],
   "prepare_dedup": {
@@ -161,6 +165,12 @@
   "production_changed": false,
   "test_source_normalization": {
     "compared_zig_sources": 442,
-    "result": "identical after CRLF-to-LF normalization; production replay forces core.autocrlf=false"
+    "result": "identical after CRLF-to-LF normalization; production replay forces core.autocrlf=false",
+    "note": "All sources except the intentional test-only planner probe match the prior21-patch LF replay byte-for-byte."
+  },
+  "followup": {
+    "test_only_planner_patch": "0101-planner-mutation-probe.patch",
+    "production_planner_mutants_enabled": false,
+    "native_linux_runtime_gates": "mandatory before switching production"
   }
 }

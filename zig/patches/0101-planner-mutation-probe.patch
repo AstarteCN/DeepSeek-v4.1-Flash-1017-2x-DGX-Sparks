@@ -1,0 +1,32 @@
+# Test-only mutation placement: keep the const production planner free of mutating fault probes.
+# No runtime feature or release planner behavior change (builtin.is_test=false). Apache-2.0.
+--- a/zig/src/families/dsv41/parts.zig
++++ b/zig/src/families/dsv41/parts.zig
+@@ -886,11 +886,6 @@
+                 try e.op(.{ .stale = .{ .kept = k.id, .gen = k.gen } });
+             }
+         }
+-        if (self.mut(.counted_at_plan)) if (plan.why) |w| if (plan.mode == .carry) {
+-            const c = &@constCast(self).counters;
+-            c.reason(w).* += 1;
+-            c.hits += 1;
+-        };
+         return plan;
+     }
+ 
+@@ -1753,7 +1748,14 @@
+     }
+ 
+     fn plan(f: *Fx, req: Request) !Plan {
+-        return f.pl.planAdmit(f.gpa, req);
++        const p = try f.pl.planAdmit(f.gpa, req);
++        // Fault injection belongs to this mutable test fixture, not the const planner.
++        // Optimized builds may otherwise reuse the planner's read-only field observations.
++        if (f.pl.mut(.counted_at_plan)) if (p.why) |w| if (p.mode == .carry) {
++            f.pl.counters.reason(w).* += 1;
++            f.pl.counters.hits += 1;
++        };
++        return p;
+     }
+ 
+     fn apply(f: *Fx, p: *const Plan) !void {

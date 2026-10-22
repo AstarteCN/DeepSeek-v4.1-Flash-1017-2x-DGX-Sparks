@@ -29,3 +29,7 @@ The explicit candidate overlay is `tests/integration-pr30-pr40/candidate.env.exa
 No running service, default image, security, network, API/authentication or generation setting is changed by checking out this branch. Spill and automatic pair restarts start **off for evidence-preserving A/B**; their code is present and later validation is separate.
 
 See [capacity and memory](capacity-memory.md), [test results](offline-results.md), and [build, tonight A/B and rollback](tonight-plan.md). CPU/static results are not GPU validation or production stability.
+
+## Follow-up checkpoint
+
+The active series now has22 patches: upstream20, local0014 preservation0100 and test-only planner probe0101. See [failure-followup.md](failure-followup.md) for optimized-mode/test portability corrections, exact weight lock and mandatory Linux/ARM64 gates. This remains an undeployed candidate.

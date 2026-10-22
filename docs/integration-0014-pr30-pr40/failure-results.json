@@ -1,0 +1,104 @@
+{
+  "planner": [
+    {
+      "mode": "Debug",
+      "rc": 0,
+      "seconds": 16.375,
+      "passed_tests": 3
+    },
+    {
+      "mode": "ReleaseSafe",
+      "rc": 0,
+      "seconds": 12.625,
+      "passed_tests": 3
+    },
+    {
+      "mode": "ReleaseFast",
+      "rc": 0,
+      "seconds": 13.077999999979511,
+      "passed_tests": 3
+    }
+  ],
+  "port": {
+    "passed": 134,
+    "executed": 134,
+    "mandatory_linux_skips": 4,
+    "strict_windows_exit": 2
+  },
+  "mock": {
+    "expectations": 93,
+    "unmet": 0,
+    "native_linux_runbook": "not_run; mandatory",
+    "seconds": 194.375
+  },
+  "portability_unit": {
+    "passed": 2
+  },
+  "weight_profile": {
+    "passed": 4
+  },
+  "source_replay": {
+    "patches": 22,
+    "preserved_0014_files": {
+      "zig/src/server/hf_text.zig": "c3d5a1c288ea56546ff23a3d2d6bdc7604f06f7bfbe4423720ae234f50c887bf",
+      "zig/src/core/template/eval.zig": "0151fd73821d69a6d6f004f55da386d1d5a324f7bd17a2ee335fbbe6e68ef2ce",
+      "zig/src/families/dsv41/vision.zig": "e36dfa4c9422b1f0639b6a88d39e996299699ebe3cc2dbe5e5e267f0aa2e7ae1"
+    }
+  },
+  "production_probe": [
+    {
+      "mode": "ReleaseSafe",
+      "binaries": {
+        "original": {
+          "sha256": "150b26cba60c6eba79dff0845e81f508de4b96c03324835322e96c7c2594b414",
+          "bytes": 712192,
+          "output": "PRODUCTION builtin.is_test=false plan=0 apply=1\n"
+        },
+        "fixed": {
+          "sha256": "9499d8e4fdb93e77787b02d43a503349d105db45329b3d74813d9da16c1cb11f",
+          "bytes": 712192,
+          "output": "PRODUCTION builtin.is_test=false plan=0 apply=1\n"
+        }
+      },
+      "binary_identical": false
+    },
+    {
+      "mode": "ReleaseFast",
+      "binaries": {
+        "original": {
+          "sha256": "32aae4f0e13d8655a5dd7c4fb9878943572b0455488e7956b05bbf795ab2048a",
+          "bytes": 660992,
+          "output": "PRODUCTION builtin.is_test=false plan=0 apply=1\n"
+        },
+        "fixed": {
+          "sha256": "d906eb98d109bd3c41c3f5efffe17487016b7eb4e4dad42f004e4c7f6c3b2c01",
+          "bytes": 660992,
+          "output": "PRODUCTION builtin.is_test=false plan=0 apply=1\n"
+        }
+      },
+      "binary_identical": false
+    }
+  ],
+  "gpu_validation": "not_run",
+  "deployed": false,
+  "planner_fresh_22_patch_replay": [
+    {
+      "mode": "Debug",
+      "rc": 0,
+      "seconds": 18.203,
+      "passed_tests": 3
+    },
+    {
+      "mode": "ReleaseSafe",
+      "rc": 0,
+      "seconds": 15.156,
+      "passed_tests": 3
+    },
+    {
+      "mode": "ReleaseFast",
+      "rc": 0,
+      "seconds": 15.093,
+      "passed_tests": 3
+    }
+  ]
+}

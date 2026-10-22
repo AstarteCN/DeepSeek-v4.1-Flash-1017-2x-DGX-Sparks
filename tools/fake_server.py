@@ -53,6 +53,7 @@ import collections
 import hashlib
 import json
 import os
+import shutil
 import re
 import select
 import socket
@@ -285,8 +286,7 @@ class Fake:
     def free_bytes(self, r=0):
         if self.a.disk_free_bytes:
             return max(0, self.a.disk_free_bytes - self.stored[r])
-        s = os.statvfs(self.roots[r])
-        return s.f_bavail * s.f_frsize
+        return shutil.disk_usage(self.roots[r]).free
 
     def need_bytes(self, r, hashes):
         """What a point would add on rank r (store.zig keep: new blocks, small state, ids, header, 80 B a block)."""
