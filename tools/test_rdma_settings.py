@@ -15,7 +15,8 @@ class RdmaSettingsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             (root / "scripts").mkdir()
-            for name in ("start.sh", "scripts/config.sh", "scripts/nodes.sh"):
+            # Public dependency closure only: never copy a user's private local.sh or .env.
+            for name in ("start.sh", "scripts/config.sh", "scripts/nodes.sh", "scripts/port.sh", "scripts/memavail.sh"):
                 shutil.copy2(ROOT / name, root / name)
             env = {"PATH": os.environ["PATH"], "HOME": folder, "ABLIT": "0", "IMAGE": "rdma-settings-test"}
             cases = [

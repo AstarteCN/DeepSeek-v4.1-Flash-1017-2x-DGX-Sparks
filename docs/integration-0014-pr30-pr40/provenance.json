@@ -91,6 +91,18 @@
     {
       "file": "0101-planner-mutation-probe.patch",
       "sha256": "28d648c2a141c7c50b40f085e570cefb152c0c08dbbb861a198b4f3ad11cc8e7"
+    },
+    {
+      "file": "0102-server-cpu-harness.patch",
+      "sha256": "ee2a85e57bdc44a068f558254ddf8e49e671ef4fd34c60250dc9a3f75cfebf70"
+    },
+    {
+      "file": "0103-cache-accounting-metrics.patch",
+      "sha256": "4e69925f59d2683ddc01e086b41856c333fa019392e4c74db72429b36c27c6f8"
+    },
+    {
+      "file": "0104-golden-harness-lifecycle.patch",
+      "sha256": "be627262a373e0f3b97bf7bf56e77b11ac06cceed605a7a76217244066f5f59a"
     }
   ],
   "prepare_dedup": {
@@ -172,5 +184,7 @@
     "test_only_planner_patch": "0101-planner-mutation-probe.patch",
     "production_planner_mutants_enabled": false,
     "native_linux_runtime_gates": "mandatory before switching production"
-  }
+  },
+  "native_cpu_gate_complete": true,
+  "gpu_validated": false
 }

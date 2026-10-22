@@ -633,16 +633,28 @@ def stub_env(work, name, state):
             fh.write(v)
     hold = os.path.join(d, "hold")
     open(hold, "w").close()
-    return d, hold, {"PATH": os.path.join(d, "bin") + ":" + os.environ["PATH"], "STUB": d, "PORT_DIR": port,
+    # Image-level BASH_ENV (e.g. NVIDIA shinit calling hostname) must not recurse
+    # through our Bash hostname stub. This affects the isolated fixture only.
+    return d, hold, {"PATH": os.path.join(d, "bin") + ":" + os.environ["PATH"], "BASH_ENV": os.devnull, "STUB": d, "PORT_DIR": port,
                      "DAILY_DIR": os.path.join(d, "daily"), "SESS": os.path.join(d, "sess"), "HOLD": hold,
                      "WORKER": "gx10-b.invalid", "GPU_VALIDATE_HOST_OK": "1", "VERIFY_RESTORE": "0"}
 
 
 def t_runbook(work):
+    # The real restore path always runs smoke.py. Curl/systemctl stubs alone do not
+    # provide that HTTP API; use the existing synthetic server, never a host API.
+    api = Fake(work, "runbook-smoke", *FAST)
+    try:
+        _t_runbook(work, api.url)
+    finally:
+        api.stop()
+
+
+def _t_runbook(work, api_url):
     sh = os.path.join(HERE, "gpu_validate.sh")
     run(work, "runbook: bash -n", ["bash", "-n", sh])
     env = {"PORT_DIR": os.path.join(work, "port-checkout"), "DAILY_DIR": os.path.join(work, "daily"),
-           "SESS": os.path.join(work, "sess"), "WORKER": "gx10-b.invalid", "GPU_VALIDATE_HOST_OK": "1"}
+           "SESS": os.path.join(work, "sess"), "WORKER": "gx10-b.invalid", "GPU_VALIDATE_HOST_OK": "1", "API": api_url}
     run(work, "runbook: --dry-run all phases", ["bash", sh, "--dry-run"], env=env)
     run(work, "runbook: --dry-run selected phases", ["bash", sh, "--dry-run", "--phases", "hold,stop,restore"], env=env)
     run(work, "runbook: unknown phase refused", ["bash", sh, "--dry-run", "--phases", "nope"], expect_ok=False, env=env)
@@ -660,6 +672,7 @@ def t_runbook(work):
     results.append(("runbook: the refusal patterns match the engine's texts only", len(pat) == 2 and all(hits)))
 
     def said(label, args, env, want, unwanted=()):
+        env = dict(env, API=api_url)
         p = subprocess.run(["bash", sh] + args, capture_output=True, text=True, env=dict(os.environ, **env), timeout=120)
         out = p.stdout + p.stderr
         calls = open(os.path.join(env["STUB"], "calls")).read() if "STUB" in env and \

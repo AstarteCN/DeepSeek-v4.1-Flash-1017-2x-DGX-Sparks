@@ -1,0 +1,77 @@
+{
+  "cpu_native_complete": true,
+  "server_unit_suites": [
+    "82",
+    "89"
+  ],
+  "new_cache_unit_cases": 4,
+  "native_http_normal_requests": 8,
+  "native_http_cancel_requests": 1,
+  "native_http_epoch_reset": true,
+  "golden_cases": 319,
+  "golden_exact": 312,
+  "golden_preexisting_known": 7,
+  "golden_unexpected": 0,
+  "golden_safe_allocator_leaks": true,
+  "runbook_expectations": 21,
+  "runbook_failed": 0,
+  "rdma_fixture_pass": true,
+  "dashboard_native_tests": 46,
+  "dashboard_native_failed": 0,
+  "model_inference_tested": false,
+  "production_changed": false,
+  "scripted_shutdown_leak_diagnostics": {
+    "baseline": {
+      "allocation_sizes": [
+        4,
+        5,
+        5,
+        5,
+        5,
+        5,
+        6,
+        6,
+        15,
+        15,
+        15,
+        15,
+        15,
+        144,
+        144,
+        160,
+        168,
+        416,
+        760,
+        1572928
+      ],
+      "bytes": 1574836,
+      "count": 20
+    },
+    "cache-counter": {
+      "allocation_sizes": [
+        4,
+        5,
+        5,
+        5,
+        5,
+        5,
+        6,
+        6,
+        15,
+        15,
+        15,
+        15,
+        15,
+        144,
+        144,
+        160,
+        168,
+        416,
+        1572928
+      ],
+      "bytes": 1574076,
+      "count": 19
+    }
+  },
+  "gpu_validated": false
+}

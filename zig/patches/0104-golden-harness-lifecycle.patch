@@ -1,0 +1,39 @@
+# Test-only golden process lifecycle: consume startup newline and reap owned children.
+--- a/zig/tests/server/golden_check.zig
++++ b/zig/tests/server/golden_check.zig
+@@ -380,16 +380,16 @@
+     var rbuf: [4096]u8 = undefined;
+     var reader = child.stdout.?.reader(io, &rbuf);
+     while (true) {
+-        const line = reader.interface.takeDelimiterExclusive('\n') catch return error.NoPortLine;
++        const line = reader.interface.takeDelimiterInclusive('\n') catch return error.NoPortLine;
+         if (std.mem.startsWith(u8, line, "PORT ")) {
+-            const port = try std.fmt.parseInt(u16, std.mem.trim(u8, line[5..], " \r"), 10);
++            const port = try std.fmt.parseInt(u16, std.mem.trim(u8, line[5..], " \r\n"), 10);
+             return .{ .child = child, .port = port, .log_path = log_path, .key_path = key_path };
+         }
+     }
+ }
+ 
+ pub fn main(init: std.process.Init) !void {
+-    const gpa = init.gpa;
++    const gpa = init.arena.allocator(); // Same ownership as runCase result tables.
+     const io = init.io;
+     const args = try init.minimal.args.toSlice(init.arena.allocator());
+     if (args.len != 5) return error.ExpectedArgs;
+@@ -407,6 +407,7 @@
+     var server: ?Server = null;
+     defer if (server) |*s| if (s.child.id) |pid| {
+         posix.kill(pid, posix.SIG.TERM) catch {};
++        _ = s.child.wait(io) catch {};
+     };
+ 
+     const steps = plan.object.get("steps").?.array.items;
+@@ -414,6 +415,7 @@
+         const obj = step.object;
+         if (server) |*s| if (s.child.id) |pid| {
+             posix.kill(pid, posix.SIG.TERM) catch {};
++            _ = s.child.wait(io) catch {}; // Reap the previous fixture before spawning another.
+         };
+         var argv: std.ArrayList([]const u8) = .empty;
+         for (obj.get("args").?.array.items) |v| try argv.append(init.arena.allocator(), v.string);
